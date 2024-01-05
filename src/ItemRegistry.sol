@@ -34,8 +34,11 @@ contract ChannelRegistry {
     error Input_Length_Mismatch();
     error No_Add_Access();
     error No_Remove_Access();        
+    error Unuathorized_Sender();        
 
+    event NewChannel(address sender, uint256 userId, uint256 channelId, uint256[] participants, Roles[] roles, string uri);
     event Add(address itemRegistry, uint256 userId, uint256 channelId, uint256 itemId);
+    event Remove(address itemRegistry, uint256 userId, uint256 channelId, uint256 itemId);
 
     enum Roles {
         NONE,
@@ -45,7 +48,7 @@ contract ChannelRegistry {
 
     IdRegistry public idRegistry;
     DelegateRegistry public delegateRegistry;
-    ItemRegistry public itemRegistry
+    ItemRegistry public itemRegistry;
 
     constructor(address _idRegistry, address _delegateRegistry, address _itemRegistry) {
         idRegistry = IdRegistry(_idRegistry);
@@ -55,7 +58,7 @@ contract ChannelRegistry {
     
     uint256 public channelCount;
     mapping(uint256 channelId => uint256 creator) public creatorForChannel;
-    mapping(uint256 channelId => string uri) public uriForChannel
+    mapping(uint256 channelId => string uri) public uriForChannel;
     mapping(uint256 channelId => mapping(uint256 userId => Roles)) public rolesForChannel;
     mapping(uint256 itemId => uint256 channelId) public channelForItem;
     // Used to keep track of what user added an item to a channel
@@ -68,7 +71,7 @@ contract ChannelRegistry {
         string memory uri
     ) public returns (uint256 channelId) {
         // Cache msg.sender
-        address sender = msg.sender
+        address sender = msg.sender;
         // Check that sender has write access for userId
         if (sender != idRegistry.custodyOf(userId) 
             && sender != delegateRegistry.delegateOf(userId)
@@ -76,11 +79,11 @@ contract ChannelRegistry {
         // Increment channel count
         channelId = ++channelCount;
         // Setup channel
-        creatorForChannel[channelId].creator = userId;
-        uriForChannel[channelId].uri = uri;
+        creatorForChannel[channelId] = userId;
+        uriForChannel[channelId] = uri;
         if (participants.length != roles.length) revert Input_Length_Mismatch();
         for (uint256 i; i < participants.length; ++i) {
-            rolesForChannnel[channelId][participants[i] = roles[i]];
+            rolesForChannel[channelId][participants[i]] = roles[i];
         }
         // Emit for indexing
         emit NewChannel(sender, userId, channelId, participants, roles, uri); 
@@ -91,7 +94,7 @@ contract ChannelRegistry {
     // NOTE: might need to make the itemIds some hash of ItemRegistry + ItemId (to allow for redundant numbers)
     function add(uint256 userId, uint256 channelId, uint256 itemId) public {
         // Cache msg.sender
-        address sender = msg.sender
+        address sender = msg.sender;
         // Check that sender was valid itemRegistry
         if (sender != address(itemRegistry)) revert Unuathorized_Sender();        
         // Check add access
@@ -105,7 +108,7 @@ contract ChannelRegistry {
 
     function remove(uint256 userId, uint256 channelId, uint256 itemId) public {
         // Cache msg.sender
-        address sender = msg.sender
+        address sender = msg.sender;
         // Check that sender has write access for userId
         if (sender != idRegistry.custodyOf(userId) 
             && sender != delegateRegistry.delegateOf(userId)
@@ -115,7 +118,7 @@ contract ChannelRegistry {
         // Remove item from channel
         delete channelForItem[itemId];
         // Emit for indexing
-        emit Remove(sender, userId, uint256 channelId, uint256 itemId);
+        emit Remove(sender, userId, channelId, itemId);
     }
 }
 
@@ -134,7 +137,9 @@ contract ItemRegistry {
 
     //////////////////////////////////////////////////
     // EVENTS
-    //////////////////////////////////////////////////            
+    //////////////////////////////////////////////////           
+
+    event NewItem(address sender, uint256 userId, uint256 itemId); 
 
     //////////////////////////////////////////////////
     // CONSTANTS
@@ -168,7 +173,7 @@ contract ItemRegistry {
 
     function newItem(uint256 userId, bytes calldata data, uint256[] memory channels) public returns (uint256 itemId) {
         // Cache msg.sender
-        address sender = msg.sender
+        address sender = msg.sender;
         // Check that sender has write access for userId
         if (sender != idRegistry.custodyOf(userId) 
             && sender != delegateRegistry.delegateOf(userId)
@@ -176,15 +181,15 @@ contract ItemRegistry {
         // Increment item count
         itemId = ++itemCount;
         // Store data for item
-        pointerForItem[itemId] = SSTORE2.write(data)
+        pointerForItem[itemId] = SSTORE2.write(data);
         // Store creator for item
-        creatorForItem[id] = userId;     
+        creatorForItem[itemId] = userId;     
         // Add item to channel(s)
         for (uint256 i; i < channels.length; ++i) {
             channelRegistry.add(userId, channels[i], itemId);            
         }            
         // Emit data for indexing
-        emit NewItem(sender, userId, itemId)
+        emit NewItem(sender, userId, itemId);
     }
 
     //////////////////////////////////////////////////
