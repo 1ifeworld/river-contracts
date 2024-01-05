@@ -1,0 +1,3 @@
+openzeppelin-contracts/=lib/openzeppelin-contracts/contracts/
+light-account/=lib/light-account/
+sstore2/=lib/sstore2/contracts/
