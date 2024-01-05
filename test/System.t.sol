@@ -123,7 +123,9 @@ contract SystemTest is Test {
         assertEq(itemRegistry.dataForItem(1), pointers[0]);
         assertEq(itemRegistry.rendererForItem(1), address(stringRenderer));
         assertEq(itemRegistry.creatorForItem(1), 1);
+        assertEq(itemRegistry.itemUri(1), ipfsString);
         assertEq(channelRegistry.channelForItem(1), 1);
+        assertEq(channelRegistry.adderForItem(1), 1);
         assertEq(channelRegistry.adderForItem(1), 1);
     }
 
