@@ -13,8 +13,30 @@ import {ERC1155} from "openzeppelin-contracts/token/ERC1155/ERC1155.sol";
  * @author Lifeworld
  */
 contract IdRegistry {
+    
+    error Has_Id();
+
+    event Register(address sender, uint256 id, address recovery);
+    
+    uint256 public idCount;
     mapping(uint256 userId => address custody) public custodyOf;
     mapping(address custody => uint256 userId) public idOf;
+    mapping(uint256 userId  => address recovery) public recoveryOf;
+
+    function register(address recovery) external returns (uint256 id) {
+        // Cache msg.sender
+        address sender = msg.sender;        
+        // Revert if the sender already has an id
+        if (idOf[sender] != 0) revert Has_Id();    
+        // Increment idCount
+        id = ++idCount;
+        // Assign id 
+        idOf[sender] = id;
+        custodyOf[id] = sender;
+        recoveryOf[id] = recovery;
+        // Emit for indexing
+        emit Register(sender, id, recovery);        
+    }    
 }
 
 /**
@@ -120,7 +142,20 @@ contract ChannelRegistry {
         // Emit for indexing
         emit Remove(sender, userId, channelId, itemId);
     }
+
+    function getRoleForChannel(uint256 channelId, uint256 userId) public view returns (Roles role) {
+        return rolesForChannel[channelId][userId];
+    }    
 }
+
+/**
+ * @title IRenderer
+ * @author Lifeworld
+ */
+interface IRenderer {
+    function decodeUri(address pointer) external view returns (string memory);
+}
+
 
 /**
  * @title ItemRegistry
@@ -147,52 +182,71 @@ contract ItemRegistry {
 
     IdRegistry public idRegistry;
     DelegateRegistry public delegateRegistry;    
-    ChannelRegistry public channelRegistry;    
 
     //////////////////////////////////////////////////
     // STORAGE
     //////////////////////////////////////////////////      
 
     uint256 public itemCount;
-    mapping(uint256 itemId => address pointer) public pointerForItem;
+    mapping(uint256 itemId => address pointer) public dataForItem;
+    mapping(uint256 itemId => address renderer) public rendererForItem;
     mapping(uint256 itemId => uint256 userId) public creatorForItem;     
 
     //////////////////////////////////////////////////
     // CONSTRUCTOR
     //////////////////////////////////////////////////                
 
-    constructor(address _idRegistry, address _delegateRegistry, address _channelRegistry) {
+    constructor(address _idRegistry, address _delegateRegistry) {
         idRegistry = IdRegistry(_idRegistry);
         delegateRegistry = DelegateRegistry(_delegateRegistry);
-        channelRegistry = ChannelRegistry(_channelRegistry);
     }
 
     //////////////////////////////////////////////////
     // WRITES
     //////////////////////////////////////////////////       
 
-    function newItem(uint256 userId, bytes calldata data, uint256[] memory channels) public returns (uint256 itemId) {
+    struct NewItemInfo {
+        address renderer;
+        bytes data;
+        uint256[] channels;
+    }
+
+    function newItems(uint256 userId, address channelRegistry, NewItemInfo[] memory newItemInfo) public returns (uint256[] memory itemIds, address[] memory pointers) {
         // Cache msg.sender
         address sender = msg.sender;
         // Check that sender has write access for userId
         if (sender != idRegistry.custodyOf(userId) 
             && sender != delegateRegistry.delegateOf(userId)
         ) revert Unuathorized_Sender();        
-        // Increment item count
-        itemId = ++itemCount;
-        // Store data for item
-        pointerForItem[itemId] = SSTORE2.write(data);
-        // Store creator for item
-        creatorForItem[itemId] = userId;     
-        // Add item to channel(s)
-        for (uint256 i; i < channels.length; ++i) {
-            channelRegistry.add(userId, channels[i], itemId);            
-        }            
-        // Emit data for indexing
-        emit NewItem(sender, userId, itemId);
+        // Setup memory arrays to return
+        itemIds = new uint256[](newItemInfo.length);
+        pointers = new address[](newItemInfo.length);
+        // Set for loop
+        for (uint256 i; i < newItemInfo.length; ++i) {
+            // Increment item count
+            uint256 itemId = ++itemCount;
+            // Store data + renderer for item
+            dataForItem[itemId] = SSTORE2.write(newItemInfo[i].data);       
+            rendererForItem[itemId] = newItemInfo[i].renderer;     
+            // Store creator for item
+            creatorForItem[itemId] = userId;                 
+            // Add item to channel(s)
+            for (uint256 j; j < newItemInfo[i].channels.length; ++j) {
+                ChannelRegistry(channelRegistry).add(userId, newItemInfo[i].channels[i], itemId);            
+            }   
+            // Set memory array values for return
+            itemIds[i] = itemId;
+            pointers[i] = dataForItem[itemId];
+            // Emit data for indexing
+            emit NewItem(sender, userId, itemId);            
+        }    
     }
 
     //////////////////////////////////////////////////
     // READS
     //////////////////////////////////////////////////           
+
+    function itemUri(uint256 itemId) public view returns (string memory uri) {
+        return IRenderer(rendererForItem[itemId]).decodeUri(dataForItem[itemId]);
+    }
 }
