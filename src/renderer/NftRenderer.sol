@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.23;
 
-import "sstore2/SSTORE2.sol";
-import "solidity-bytes-utils/BytesLib.sol";
 import {MetadataBuilder} from "micro-onchain-metadata-utils/MetadataBuilder.sol";
 import {MetadataJSONKeys} from "micro-onchain-metadata-utils/MetadataJSONKeys.sol";
 import {Strings} from "openzeppelin-contracts/utils/Strings.sol";
@@ -13,14 +11,14 @@ import {Strings} from "openzeppelin-contracts/utils/Strings.sol";
  */
 contract NftRenderer {
 
-    function decodeUri(address pointer) public view returns (string memory uri) {
+    function render(bytes memory data) external pure returns (string memory uri) {
         // Fetch + decode data from pointer
         (
             uint256 chainId, 
             address tokenContract, 
             uint256 tokenId,
             bool hasId
-        ) = abi.decode(SSTORE2.read(pointer), (uint256, address, uint256, bool));
+        ) = abi.decode(data, (uint256, address, uint256, bool));
         // Initialize JSON fields
         MetadataBuilder.JSONItem[] memory items = new MetadataBuilder.JSONItem[](4);
         // Set JSON fields

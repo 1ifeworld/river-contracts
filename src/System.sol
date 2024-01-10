@@ -6,7 +6,6 @@ import "solidity-bytes-utils/BytesLib.sol";
 import {MetadataBuilder} from "micro-onchain-metadata-utils/MetadataBuilder.sol";
 import {MetadataJSONKeys} from "micro-onchain-metadata-utils/MetadataJSONKeys.sol";
 import {Strings} from "openzeppelin-contracts/utils/Strings.sol";
-import {ERC1155} from "openzeppelin-contracts/token/ERC1155/ERC1155.sol";
 
 /**
  * @title IdRegstiry
