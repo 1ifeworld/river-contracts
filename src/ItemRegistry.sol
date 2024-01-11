@@ -52,7 +52,6 @@ contract ItemRegistry {
     DelegateRegistry public delegateRegistry;    
     ChannelRegistry public channelRegistry;    
     uint256 public itemCount;
-    // mapping(uint256 itemId => uint256 userId) public creatorForItem;  // could turn this into admin for item? first admin = creator?
     mapping(uint256 itemId => mapping(uint256 userId => bool status)) public adminForItem;
     mapping(uint256 itemId => address pointer) public dataForItem;
     mapping(uint256 itemId => mapping(uint256 channelId => uint256 userId)) public addedItemToChannel;
