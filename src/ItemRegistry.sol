@@ -142,6 +142,7 @@ contract ItemRegistry {
         if (!adminForItem[itemId][userId]) revert No_Erase_Access();
         // Erase item
         delete dataForItem[itemId];
+        delete adminForItem[itemId][userId]; // NOTE: this doesnt erase item fully
         // Emit for indexing
         emit Erase(sender, userId, itemId);
     }    
