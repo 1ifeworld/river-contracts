@@ -1,8 +1,9 @@
 {
     "IdRegistry": "0x73c68a5Cc6d6586CA5Bd2F0c6f8eC8524f33557b.",
     "DelegateRegistry": "0xDc4D28a3010ad7aAfFc24c377Ebb7Cb4d32A1Ae9",
-    "ChannelRegistry": "0x372d44903056fCdF643B75a660Fb0e8D79A7293F",
-    "ItemRegistry": "0x5226c4A81ed525bdc4AA97558fb596ddd9B34e0E",
+    "ChannelRegistry": "0x0dE97a5bc300d20A0D629179cF678296177854E8",
+    "ItemRegistry": "0xf35776f159614B573C2Ae10F95407ed8b70D4C73",
+    "RoleBasedAccess": "0x412CAEe8a5EE5741bED459951C091f8FfaA14778",
     "StringRenderer": "0x1358b4111fbfD1929D3D47cfab2f00bF134e3918",
     "NftRenderer": "0xc71780165ecEF5ba96B71b01B2ecA1F107A0B8c4"
 }

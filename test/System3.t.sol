@@ -3,11 +3,16 @@ pragma solidity 0.8.23;
 
 import {Test, console2} from "forge-std/Test.sol";
 
-import {IdRegistry, DelegateRegistry, ChannelRegistry, ItemRegistry} from "../src/System.sol";
+import {IdRegistry} from "../src/IdRegistry.sol";
+import {DelegateRegistry} from "../src/DelegateRegistry.sol";
+import {ChannelRegistry} from "../src/ChannelRegistry.sol";
+import {ItemRegistry} from "../src/ItemRegistry.sol";
+
+import {RoleBasedAccess} from "../src/logic/RoleBasedAccess.sol";
 import {StringRenderer} from "../src/renderer/StringRenderer.sol";
 import {NftRenderer} from "../src/renderer/NftRenderer.sol";
 
-contract SystemTest is Test {       
+contract System3Test is Test {       
 
     //////////////////////////////////////////////////
     // CONSTANTS
@@ -22,6 +27,7 @@ contract SystemTest is Test {
     ChannelRegistry public channelRegistry;
     ItemRegistry public itemRegistry;
     StringRenderer public stringRenderer;
+    RoleBasedAccess public roleBasedAccess;
     NftRenderer public nftRenderer;
     Account public relayer;
     Account public user;     
@@ -40,9 +46,10 @@ contract SystemTest is Test {
     // Set-up called before each test
     function setUp() public {
         idRegistry = new IdRegistry();  
-        delegateRegistry = new DelegateRegistry();  
-        itemRegistry = new ItemRegistry(address(idRegistry), address(delegateRegistry));  
-        channelRegistry = new ChannelRegistry(address(idRegistry), address(delegateRegistry), address(itemRegistry));  
+        delegateRegistry = new DelegateRegistry();          
+        channelRegistry = new ChannelRegistry(address(idRegistry), address(delegateRegistry));  
+        itemRegistry = new ItemRegistry(address(idRegistry), address(delegateRegistry), address(channelRegistry));  
+        roleBasedAccess = new RoleBasedAccess(address(idRegistry), address(delegateRegistry));  
         stringRenderer = new StringRenderer();  
         nftRenderer = new NftRenderer();  
         relayer = makeAccount("relayer");
@@ -71,22 +78,23 @@ contract SystemTest is Test {
         // register userId to user
         idRegistry.register(address(0));
         // prep data for new channel
-        uint256[] memory participants = new uint256[](1);
-        participants[0] = 1;
-        ChannelRegistry.Roles[] memory roles = new ChannelRegistry.Roles[](1);
-        roles[0] = ChannelRegistry.Roles.ADMIN;
+        uint256[] memory userIds = new uint256[](1);
+        userIds[0] = 1;
+        RoleBasedAccess.Roles[] memory roles = new RoleBasedAccess.Roles[](1);
+        roles[0] = RoleBasedAccess.Roles.ADMIN;
+        bytes memory logicInit = abi.encode(userIds, roles);
         // create new channel
         channelRegistry.newChannel(
             1,
-            participants,
-            roles,
-            ipfsString
+            ipfsString,
+            address(roleBasedAccess),
+            logicInit
         );
-        // test channel creation
+        // // test channel creation
         assertEq(channelRegistry.channelCount(), 1);
-        assertEq(channelRegistry.creatorForChannel(1), 1);
+        assertEq(channelRegistry.logicForChannel(1), address(roleBasedAccess));
         assertEq(channelRegistry.uriForChannel(1), ipfsString);
-        require(channelRegistry.getRoleForChannel(1, 1) == ChannelRegistry.Roles.ADMIN, "incorrect role");
+        require(roleBasedAccess.rolesForChannel(address(channelRegistry), 1, 1) == RoleBasedAccess.Roles.ADMIN, "incorrect role");
     }
 
     function test_newItem() public {
@@ -94,39 +102,33 @@ contract SystemTest is Test {
         // register userId to user
         idRegistry.register(address(0));
         // prep data for new channel
-        uint256[] memory participants = new uint256[](1);
-        participants[0] = 1;
-        ChannelRegistry.Roles[] memory roles = new ChannelRegistry.Roles[](1);
-        roles[0] = ChannelRegistry.Roles.ADMIN;
+        uint256[] memory userIds = new uint256[](1);
+        userIds[0] = 1;
+        RoleBasedAccess.Roles[] memory roles = new RoleBasedAccess.Roles[](1);
+        roles[0] = RoleBasedAccess.Roles.ADMIN;
+        bytes memory logicInit = abi.encode(userIds, roles);
         // create new channel
         channelRegistry.newChannel(
             1,
-            participants,
-            roles,
-            ipfsString
+            ipfsString,
+            address(roleBasedAccess),
+            logicInit
         );
         // prep data for new item
-        ItemRegistry.NewItemInfo[] memory newItemInfo = new ItemRegistry.NewItemInfo[](1);
-        newItemInfo[0].renderer = address(stringRenderer);
-        newItemInfo[0].data = ipfsBytes;
+        ItemRegistry.NewItem[] memory newItemInput = new ItemRegistry.NewItem[](1);
+        // packs data so that [:20] == address of renderer, [20:] == bytes for renderer to decode into string
+        newItemInput[0].data = abi.encodePacked(address(stringRenderer), ipfsBytes);
         uint256[] memory channels = new uint256[](1);
         channels[0] = 1;        
-        newItemInfo[0].channels = channels;
+        newItemInput[0].channels = channels;
         // create item
-        (uint256[] memory itemIds, address[] memory pointers) = itemRegistry.newItems(
-            1,
-            address(channelRegistry),
-            newItemInfo
-        );
+        (, address[] memory pointers) = itemRegistry.newItems(1, newItemInput);
         // test new item
         assertEq(itemRegistry.itemCount(), 1);
         assertEq(itemRegistry.dataForItem(1), pointers[0]);
-        assertEq(itemRegistry.rendererForItem(1), address(stringRenderer));
-        assertEq(itemRegistry.creatorForItem(1), 1);
+        assertEq(itemRegistry.adminForItem(1, 1), true);        
+        assertEq(itemRegistry.addedItemToChannel(1, 1), 1); // itemid1 was added to channelid1 by userid1
         assertEq(itemRegistry.itemUri(1), ipfsString);
-        assertEq(channelRegistry.channelForItem(1), 1);
-        assertEq(channelRegistry.adderForItem(1), 1);
-        assertEq(channelRegistry.adderForItem(1), 1);
     }
 
     //////////////////////////////////////////////////
