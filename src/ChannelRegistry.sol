@@ -4,12 +4,14 @@ pragma solidity 0.8.23;
 import {IdRegistry} from "./IdRegistry.sol";
 import {DelegateRegistry} from "./DelegateRegistry.sol";
 import {ILogic} from "./interfaces/ILogic.sol";
+import {Salt} from "./utils/Salt.sol";
+import {Hash} from "./utils/Hash.sol";
 
 /**
  * @title ChannelRegistry
  * @author Lifeworld
  */
-contract ChannelRegistry {
+contract ChannelRegistry is Salt, Hash {
 
     //////////////////////////////////////////////////
     // ERRORS
@@ -23,7 +25,7 @@ contract ChannelRegistry {
     // EVENTS
     //////////////////////////////////////////////////        
 
-    event NewChannel(address sender, uint256 userId, uint256 channelId, string uri, address logic);
+    event NewChannel(address sender, uint256 userId, bytes32 channelHash, string uri, address logic);
 
     //////////////////////////////////////////////////
     // STORAGE
@@ -31,9 +33,9 @@ contract ChannelRegistry {
 
     IdRegistry public idRegistry;
     DelegateRegistry public delegateRegistry;
-    uint256 public channelCount;    
-    mapping(uint256 channelId => string uri) public uriForChannel;
-    mapping(uint256 channelId => address logic) public logicForChannel;    
+    mapping(uint256 userId => uint256 channelId) public channelCountForUser;
+    mapping(bytes32 channelHash => string uri) public uriForChannel;
+    mapping(bytes32 channelHash => address logic) public logicForChannel;    
 
     //////////////////////////////////////////////////
     // CONSTRUCTOR
@@ -55,32 +57,36 @@ contract ChannelRegistry {
         uint256 userId, 
         string calldata uri,
         address logic,
-        bytes memory logicInit
-    ) public returns (uint256 channelId) {
+        bytes calldata logicInit
+    ) public returns (bytes32 channelHash) {
         // Check authorization status for msg.sender
         address sender = _authorizationCheck(msg.sender, userId);
-        // Increment channel count
-        channelId = ++channelCount;
+        // Increment user channel count + generate channelHash
+        channelHash = _generateHash(userId, ++channelCountForUser[userId], CHANNEL_SALT);
         // Store channel uri
-        uriForChannel[channelId] = uri;
+        uriForChannel[channelHash] = uri;
         // Setup channel logic
-        logicForChannel[channelId] = logic;
-        ILogic(logic).initializeWithData(userId, channelId, logicInit);
+        logicForChannel[channelHash] = logic;
+        ILogic(logic).initializeWithData(userId, channelHash, logicInit);
         // Emit for indexing
-        emit NewChannel(sender, userId, channelId, uri, logic); 
+        emit NewChannel(sender, userId, channelHash, uri, logic); 
     }
 
     //////////////////////////////////////////////////
     // READS
     //////////////////////////////////////////////////      
 
-    function getAddAccess(uint256 channelId, uint256 userId) public view returns (bool) {     
-        return ILogic(logicForChannel[channelId]).canAdd(channelId, userId);
+    function getAddAccess(uint256 userId, bytes32 channelHash) public view returns (bool) {     
+        return ILogic(logicForChannel[channelHash]).canAdd(userId, channelHash);
     }
 
-    function getRemoveAccess(uint256 channelId, uint256 userId) public view returns (bool) {     
-        return ILogic(logicForChannel[channelId]).canRemove(channelId, userId);
+    function getRemoveAccess(uint256 userId, bytes32 channelHash) public view returns (bool) {     
+        return ILogic(logicForChannel[channelHash]).canRemove(userId, channelHash);
     }      
+
+    function generateChannelHash(uint256 userId, uint256 channelId) external pure returns (bytes32 channelhash) {
+        return _generateHash(userId, channelId, CHANNEL_SALT);
+    }    
 
     //////////////////////////////////////////////////
     // INTERNAL

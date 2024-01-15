@@ -12,7 +12,7 @@ import {RoleBasedAccess} from "../src/logic/RoleBasedAccess.sol";
 import {StringRenderer} from "../src/renderer/StringRenderer.sol";
 import {NftRenderer} from "../src/renderer/NftRenderer.sol";
 
-contract System3Test is Test {       
+contract System4Test is Test {       
 
     //////////////////////////////////////////////////
     // CONSTANTS
@@ -76,40 +76,40 @@ contract System3Test is Test {
     function test_newChannel() public {
         vm.startPrank(user.addr);
         // register userId to user
-        idRegistry.register(address(0));
+        uint256 userId = idRegistry.register(address(0));
         // prep data for new channel
         uint256[] memory userIds = new uint256[](1);
-        userIds[0] = 1;
+        userIds[0] = userId;
         RoleBasedAccess.Roles[] memory roles = new RoleBasedAccess.Roles[](1);
         roles[0] = RoleBasedAccess.Roles.ADMIN;
         bytes memory logicInit = abi.encode(userIds, roles);
         // create new channel
-        channelRegistry.newChannel(
-            1,
+        bytes32 channelHash = channelRegistry.newChannel(
+            userId,
             ipfsString,
             address(roleBasedAccess),
             logicInit
         );
         // // test channel creation
-        assertEq(channelRegistry.channelCount(), 1);
-        assertEq(channelRegistry.logicForChannel(1), address(roleBasedAccess));
-        assertEq(channelRegistry.uriForChannel(1), ipfsString);
-        require(roleBasedAccess.rolesForChannel(address(channelRegistry), 1, 1) == RoleBasedAccess.Roles.ADMIN, "incorrect role");
+        assertEq(channelRegistry.channelCountForUser(userId), 1);
+        assertEq(channelRegistry.logicForChannel(channelHash), address(roleBasedAccess));
+        assertEq(channelRegistry.uriForChannel(channelHash), ipfsString);
+        require(roleBasedAccess.userRoleForChannel(address(channelRegistry), userId, channelHash) == RoleBasedAccess.Roles.ADMIN, "incorrect role");
     }
 
     function test_newItem() public {
         vm.startPrank(user.addr);
         // register userId to user
-        idRegistry.register(address(0));
+        uint256 userId = idRegistry.register(address(0));
         // prep data for new channel
         uint256[] memory userIds = new uint256[](1);
-        userIds[0] = 1;
+        userIds[0] = userId;
         RoleBasedAccess.Roles[] memory roles = new RoleBasedAccess.Roles[](1);
         roles[0] = RoleBasedAccess.Roles.ADMIN;
         bytes memory logicInit = abi.encode(userIds, roles);
         // create new channel
-        channelRegistry.newChannel(
-            1,
+        bytes32 channelHash = channelRegistry.newChannel(
+            userId,
             ipfsString,
             address(roleBasedAccess),
             logicInit
@@ -118,17 +118,17 @@ contract System3Test is Test {
         ItemRegistry.NewItem[] memory newItemInput = new ItemRegistry.NewItem[](1);
         // packs data so that [:20] == address of renderer, [20:] == bytes for renderer to decode into string
         newItemInput[0].data = abi.encodePacked(address(stringRenderer), ipfsBytes);
-        uint256[] memory channels = new uint256[](1);
-        channels[0] = 1;        
+        bytes32[] memory channels = new bytes32[](1);
+        channels[0] = channelHash;        
         newItemInput[0].channels = channels;
         // create item
-        (, address[] memory pointers) = itemRegistry.newItems(1, newItemInput);
+        (bytes32[] memory itemHashes, address[] memory pointers) = itemRegistry.newItems(1, newItemInput);
         // test new item
-        assertEq(itemRegistry.itemCount(), 1);
-        assertEq(itemRegistry.dataForItem(1), pointers[0]);
-        assertEq(itemRegistry.adminForItem(1, 1), true);        
-        assertEq(itemRegistry.addedItemToChannel(1, 1), 1); // itemid1 was added to channelid1 by userid1
-        assertEq(itemRegistry.itemUri(1), ipfsString);
+        assertEq(itemRegistry.itemCountForUser(userId), 1);
+        assertEq(itemRegistry.dataForItem(itemHashes[0]), pointers[0]);
+        assertEq(itemRegistry.isAdminForItem(itemHashes[0], userId), true);         
+        assertEq(itemRegistry.addedItemToChannel(itemHashes[0], channelHash), userId); // itemid1 was added to channelid1 by userid1
+        assertEq(itemRegistry.itemUri(itemHashes[0]), ipfsString);
     }
 
     //////////////////////////////////////////////////

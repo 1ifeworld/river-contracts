@@ -7,12 +7,14 @@ import {IdRegistry} from "./IdRegistry.sol";
 import {DelegateRegistry} from "./DelegateRegistry.sol";
 import {ChannelRegistry} from "./ChannelRegistry.sol";
 import {IRenderer} from "./interfaces/IRenderer.sol";
+import {Salt} from "./utils/Salt.sol";
+import {Hash} from "./utils/Hash.sol";
 
 /**
  * @title ItemRegistry
  * @author Lifeworld
  */
-contract ItemRegistry {
+contract ItemRegistry is Salt, Hash {
 
     //////////////////////////////////////////////////
     // TYPES
@@ -20,7 +22,7 @@ contract ItemRegistry {
 
     struct NewItem {
         bytes data;
-        uint256[] channels;
+        bytes32[] channels;
     }      
 
     //////////////////////////////////////////////////
@@ -38,11 +40,10 @@ contract ItemRegistry {
     // EVENTS
     //////////////////////////////////////////////////           
 
-    event NewItems(address sender, uint256 userId, uint256[] itemIds, address[] pointers); 
-    event Add(address sender, uint256 userId, uint256 channelId, uint256 itemId);    
-    event Remove(address sender, uint256 userId, uint256 channelId, uint256 itemId);
-    event Edit(address sender, uint256 userId, uint256 itemId, address pointer);
-    event Erase(address sender, uint256 userId, uint256 itemId);    
+    event NewItems(address sender, uint256 userId, bytes32[] itemHashes, address[] pointers); 
+    event Add(address sender, uint256 userId, bytes32 itemHash, bytes32 channelHash);    
+    event Remove(address sender, uint256 userId, bytes32 itemHash, bytes32 channelHash);
+    event Edit(address sender, uint256 userId, bytes32 itemHash, address pointer); 
 
     //////////////////////////////////////////////////
     // STORAGE
@@ -52,9 +53,17 @@ contract ItemRegistry {
     DelegateRegistry public delegateRegistry;    
     ChannelRegistry public channelRegistry;    
     uint256 public itemCount;
-    mapping(uint256 itemId => mapping(uint256 userId => bool status)) public adminForItem;
-    mapping(uint256 itemId => address pointer) public dataForItem;
-    mapping(uint256 itemId => mapping(uint256 channelId => uint256 userId)) public addedItemToChannel;
+    // figure how to make these items ids user specific
+    // mapping(uint256 itemId => mapping(uint256 userId => bool status)) public adminForItem;
+    // mapping(uint256 itemId => address pointer) public dataForItem;
+    // mapping(uint256 itemId => mapping(uint256 channelId => uint256 userId)) public addedItemToChannel;
+
+    mapping(uint256 userId => uint256 itemCount) public itemCountForUser;
+    mapping(bytes32 itemHash => mapping(uint256 userId => bool status)) public isAdminForItem;
+    mapping(bytes32 itemHash => address pointer) public dataForItem;
+    mapping(bytes32 itemHash => mapping(bytes32 channelHash => uint256 userId)) public addedItemToChannel;
+
+
    
     //////////////////////////////////////////////////
     // CONSTRUCTOR
@@ -70,81 +79,68 @@ contract ItemRegistry {
     // WRITES
     //////////////////////////////////////////////////       
 
+    // NOTE: consider adding arbitrary data field to newItemInputs to enable signature based access control for channels
     function newItems(uint256 userId, NewItem[] memory newItemInputs) 
         public 
-        returns (uint256[] memory itemIds, address[] memory pointers) 
+        returns (bytes32[] memory itemHashes, address[] memory pointers) 
     {
         // Check authorization status for msg.sender
         address sender = _authorizationCheck(msg.sender, userId);
         // Setup memory arrays to return
-        itemIds = new uint256[](newItemInputs.length);
+        itemHashes = new bytes32[](newItemInputs.length);
         pointers = new address[](newItemInputs.length);
         // Set for loop
         for (uint256 i; i < newItemInputs.length; ++i) {
-            // Increment item count
-            uint256 itemId = ++itemCount;
-            // Store data + creator for item      
-            dataForItem[itemId] = SSTORE2.write(newItemInputs[i].data);       
-            adminForItem[itemId][userId] = true;                 
+            // Increment user item count + generate itemhash
+            itemHashes[i] = _generateHash(userId, ++itemCountForUser[userId], ITEM_SALT);
+            // Store item data
+            pointers[i] = dataForItem[itemHashes[i]] = SSTORE2.write(newItemInputs[i].data); 
+            // Set initial item admin     
+            isAdminForItem[itemHashes[i]][userId] = true;                 
             // Add item to channel(s)
             for (uint256 j; j < newItemInputs[i].channels.length; ++j) {
-                if (!channelRegistry.getAddAccess(newItemInputs[i].channels[j], userId)) revert No_Add_Access();
-                _unsafeAddToChannel(sender, userId, newItemInputs[i].channels[j], itemId);
-            }   
-            // Set memory array values for return
-            itemIds[i] = itemId;
-            pointers[i] = dataForItem[itemId];            
+                if (!channelRegistry.getAddAccess(userId, newItemInputs[i].channels[j])) revert No_Add_Access();
+                _unsafeAddToChannel(sender, userId, itemHashes[i], newItemInputs[i].channels[j]);
+            }          
         }    
         // Emit data for indexing
-        emit NewItems(sender, userId, itemIds, pointers);
+        emit NewItems(sender, userId, itemHashes, pointers);
     }
 
     // Adds existing item to an existing channel
-    function add(uint256 userId, uint256 itemId, uint256 channelId) public {
+    // NOTE: consider adding arbitrary data field here to enable signature based access control
+    function add(uint256 userId, bytes32 itemHash, bytes32 channelHash) public {
         // Check authorization status for msg.sender
         address sender = _authorizationCheck(msg.sender, userId);
         // Check for add access
-        if (!channelRegistry.getAddAccess(channelId, userId)) revert No_Add_Access();
+        if (!channelRegistry.getAddAccess(userId, channelHash)) revert No_Add_Access();
         // Add to channel      
-        _unsafeAddToChannel(sender, userId, channelId, itemId);
+        _unsafeAddToChannel(sender, userId, itemHash, channelHash);
     }
 
-    function remove(uint256 userId, uint256 itemId, uint256 channelId) public {
+    function remove(uint256 userId, bytes32 itemHash, bytes32 channelHash) public {
         // Check authorization status for msg.sender
         address sender = _authorizationCheck(msg.sender, userId);
         // Check for remove access
-        if (userId != addedItemToChannel[userId][channelId]) {
-            if (channelRegistry.getRemoveAccess(channelId, userId)) {
+        if (userId != addedItemToChannel[itemHash][channelHash]) {
+            if (channelRegistry.getRemoveAccess(userId, channelHash)) {
                 revert No_Remove_Access();
             }
         } 
         // Remove from channel      
-        _unsafeRemoveFromChannel(sender, userId, channelId, itemId);        
+        _unsafeRemoveFromChannel(sender, userId, itemHash, channelHash);        
     }
 
-    function edit(uint256 userId, uint256 itemId, bytes calldata data) external returns (address pointer) {
+    // Passing in bytes(0) for data effectively "deletes" the contents of the item
+    function edit(uint256 userId, bytes32 itemHash, bytes calldata data) external returns (address pointer) {
         // Check authorization status for msg.sender
         address sender = _authorizationCheck(msg.sender, userId);
         // Check that user is item creator
-        if (!adminForItem[itemId][userId]) revert No_Edit_Access();        
+        if (!isAdminForItem[itemHash][userId]) revert No_Edit_Access();        
         // Update data stored for item
-        dataForItem[itemId] = pointer = SSTORE2.write(data);
+        pointer = dataForItem[itemHash] = SSTORE2.write(data);
         // Emit for indexing
-        emit Edit(sender, userId, itemId, pointer);
-    }    
-
-    // NOTE: techincally an admin could exist post data deletion and refill the slot of the item
-    //       doesnt effectively "delete" the ability to ever update an item again
-    function erase(uint256 userId, uint256 itemId) public {
-        // Check authorization status for msg.sender
-        address sender = _authorizationCheck(msg.sender, userId);
-        // Check if user is creator for item -- NOTE potentially make this an admin based setup
-        if (!adminForItem[itemId][userId]) revert No_Erase_Access();
-        // Erase item
-        delete dataForItem[itemId];
-        delete adminForItem[itemId][userId]; // NOTE: this doesnt erase item fully
-        // Emit for indexing
-        emit Erase(sender, userId, itemId);
+        emit Edit(sender, userId, itemHash, pointer);
     }    
 
     /*
@@ -158,29 +154,29 @@ contract ItemRegistry {
     function _unsafeAddToChannel(
         address sender, 
         uint256 userId, 
-        uint256 channelId, 
-        uint256 itemId
+        bytes32 itemHash,
+        bytes32 channelHash
     ) internal {
-        addedItemToChannel[itemId][channelId] = userId;
-        emit Add(sender, userId, channelId, itemId);
+        addedItemToChannel[itemHash][channelHash] = userId;
+        emit Add(sender, userId, itemHash, channelHash);
     }    
 
     function _unsafeRemoveFromChannel(
         address sender, 
         uint256 userId, 
-        uint256 channelId, 
-        uint256 itemId
+        bytes32 itemHash,
+        bytes32 channelHash
     ) internal {
-        delete addedItemToChannel[itemId][channelId];
-        emit Remove(sender, userId, channelId, itemId);
+        delete addedItemToChannel[itemHash][channelHash];
+        emit Remove(sender, userId, itemHash, channelHash);
     }    
 
     //////////////////////////////////////////////////
     // READS
     //////////////////////////////////////////////////           
 
-    function itemUri(uint256 itemId) public view returns (string memory uri) {
-        bytes memory encodedBytes = SSTORE2.read(dataForItem[itemId]);
+    function itemUri(bytes32 itemHash) public view returns (string memory uri) {
+        bytes memory encodedBytes = SSTORE2.read(dataForItem[itemHash]);
         address renderer = BytesLib.toAddress(encodedBytes, 0);
         bytes memory data = BytesLib.slice(encodedBytes, 20, (encodedBytes.length - 20));
         uri = IRenderer(renderer).render(data);
