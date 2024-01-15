@@ -33,7 +33,6 @@ contract ItemRegistry is Salt, Hash {
     error No_Add_Access();
     error No_Remove_Access();
     error No_Edit_Access();
-    error No_Erase_Access();
     error Unauthorized_Signer_For_User(uint256 userId);  
 
     //////////////////////////////////////////////////
@@ -52,18 +51,11 @@ contract ItemRegistry is Salt, Hash {
     IdRegistry public idRegistry;
     DelegateRegistry public delegateRegistry;    
     ChannelRegistry public channelRegistry;    
-    uint256 public itemCount;
-    // figure how to make these items ids user specific
-    // mapping(uint256 itemId => mapping(uint256 userId => bool status)) public adminForItem;
-    // mapping(uint256 itemId => address pointer) public dataForItem;
-    // mapping(uint256 itemId => mapping(uint256 channelId => uint256 userId)) public addedItemToChannel;
 
     mapping(uint256 userId => uint256 itemCount) public itemCountForUser;
     mapping(bytes32 itemHash => mapping(uint256 userId => bool status)) public isAdminForItem;
     mapping(bytes32 itemHash => address pointer) public dataForItem;
     mapping(bytes32 itemHash => mapping(bytes32 channelHash => uint256 userId)) public addedItemToChannel;
-
-
    
     //////////////////////////////////////////////////
     // CONSTRUCTOR
