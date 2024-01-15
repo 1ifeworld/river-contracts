@@ -7,14 +7,16 @@ import {IdRegistry} from "./IdRegistry.sol";
 import {DelegateRegistry} from "./DelegateRegistry.sol";
 import {ChannelRegistry} from "./ChannelRegistry.sol";
 import {IRenderer} from "./interfaces/IRenderer.sol";
-import {Salt} from "./utils/Salt.sol";
+import {Auth} from "./utils/Auth.sol";
 import {Hash} from "./utils/Hash.sol";
+import {Salt} from "./utils/Salt.sol";
+
 
 /**
  * @title ItemRegistry
  * @author Lifeworld
  */
-contract ItemRegistry is Salt, Hash {
+contract ItemRegistry is Auth, Hash, Salt {
 
     //////////////////////////////////////////////////
     // TYPES
@@ -33,7 +35,6 @@ contract ItemRegistry is Salt, Hash {
     error No_Add_Access();
     error No_Remove_Access();
     error No_Edit_Access();
-    error Unauthorized_Signer_For_User(uint256 userId);  
 
     //////////////////////////////////////////////////
     // EVENTS
@@ -77,7 +78,7 @@ contract ItemRegistry is Salt, Hash {
         returns (bytes32[] memory itemHashes, address[] memory pointers) 
     {
         // Check authorization status for msg.sender
-        address sender = _authorizationCheck(msg.sender, userId);
+        address sender = _authorizationCheck(idRegistry, delegateRegistry, msg.sender, userId);
         // Setup memory arrays to return
         itemHashes = new bytes32[](newItemInputs.length);
         pointers = new address[](newItemInputs.length);
@@ -103,7 +104,7 @@ contract ItemRegistry is Salt, Hash {
     // NOTE: consider adding arbitrary data field here to enable signature based access control
     function add(uint256 userId, bytes32 itemHash, bytes32 channelHash) public {
         // Check authorization status for msg.sender
-        address sender = _authorizationCheck(msg.sender, userId);
+        address sender = _authorizationCheck(idRegistry, delegateRegistry, msg.sender, userId);
         // Check for add access
         if (!channelRegistry.getAddAccess(userId, channelHash)) revert No_Add_Access();
         // Add to channel      
@@ -112,7 +113,7 @@ contract ItemRegistry is Salt, Hash {
 
     function remove(uint256 userId, bytes32 itemHash, bytes32 channelHash) public {
         // Check authorization status for msg.sender
-        address sender = _authorizationCheck(msg.sender, userId);
+        address sender = _authorizationCheck(idRegistry, delegateRegistry, msg.sender, userId);
         // Check for remove access
         if (userId != addedItemToChannel[itemHash][channelHash]) {
             if (channelRegistry.getRemoveAccess(userId, channelHash)) {
@@ -126,7 +127,7 @@ contract ItemRegistry is Salt, Hash {
     // Passing in bytes(0) for data effectively "deletes" the contents of the item
     function edit(uint256 userId, bytes32 itemHash, bytes calldata data) external returns (address pointer) {
         // Check authorization status for msg.sender
-        address sender = _authorizationCheck(msg.sender, userId);
+        address sender = _authorizationCheck(idRegistry, delegateRegistry, msg.sender, userId);
         // Check that user is item creator
         if (!isAdminForItem[itemHash][userId]) revert No_Edit_Access();        
         // Update data stored for item
@@ -174,16 +175,7 @@ contract ItemRegistry is Salt, Hash {
         uri = IRenderer(renderer).render(data);
     }
 
-    //////////////////////////////////////////////////
-    // INTERNAL
-    //////////////////////////////////////////////////   
-
-    function _authorizationCheck(address account, uint256 userId) internal view returns (address) {
-        // Check that sender has write access for userId
-        if (account != idRegistry.custodyOf(userId) 
-            && account != delegateRegistry.delegateOf(userId)
-        ) revert Unauthorized_Signer_For_User(userId);          
-        // Return account address as authorized sender
-        return account;        
-    }        
+    function generateItemHash(uint256 userId, uint256 channelId) external pure returns (bytes32 itemHash) {
+        itemHash = _generateHash(userId, channelId, ITEM_SALT);
+    }     
 }
