@@ -17,7 +17,7 @@ import {Signatures} from "./abstract/Signatures.sol";
 /*
     TODO:
     BETTER UNDERSTAND IF NEED TO ADD NONCE CHECKS
-    BACK INTO SIGNATURE FUNCTIONS
+    BACK INTO SIGNATURE FUNCTIONS. ESP FOR UPDATE ADMINS?
 */
 
 /**
@@ -42,6 +42,8 @@ contract ItemRegistry is Auth, Hash, Salt, EIP712, Signatures {
     error No_Add_Access();
     error No_Remove_Access();
     error No_Edit_Access();
+    error Input_Length_Mismatch();
+    error Only_Admin();
     
     //////////////////////////////////////////////////
     // EVENTS
@@ -51,6 +53,7 @@ contract ItemRegistry is Auth, Hash, Salt, EIP712, Signatures {
     event Add(address sender, uint256 userId, bytes32 itemHash, bytes32 channelHash);    
     event Remove(address sender, uint256 userId, bytes32 itemHash, bytes32 channelHash);
     event Edit(address sender, uint256 userId, bytes32 itemHash, address pointer); 
+    event UpdateAdmins(address sender, uint256 userId, bytes32 itemHash, uint256[] userIds, bool[] statuses);
 
     //////////////////////////////////////////////////
     // CONSTANTS
@@ -66,7 +69,10 @@ contract ItemRegistry is Auth, Hash, Salt, EIP712, Signatures {
         keccak256("Remove(uint256 userId,bytes32 itemHash,bytes32 channelHash,uint256 deadline)");              
 
     bytes32 public constant EDIT_TYPEHASH =
-        keccak256("Edit(uint256 userId,bytes32 itemHash,bytes data,uint256 deadline)");                      
+        keccak256("Edit(uint256 userId,bytes32 itemHash,bytes data,uint256 deadline)");    
+
+    bytes32 public constant UPDATE_ADMINS_TYPEHASH =
+        keccak256("Edit(uint256 userId,bytes32 itemHash,uint256[] userIds,bool[] statuses,uint256 deadline)");                            
 
     //////////////////////////////////////////////////
     // STORAGE
@@ -95,7 +101,6 @@ contract ItemRegistry is Auth, Hash, Salt, EIP712, Signatures {
     // DIRECT WRITES
     //////////////////////////////////////////////////       
 
-    // TODO: add ability to upadte admins for a given item
     // TODO: batch add function?
     // TODO: batch edit function?
     // TODO: batch remove funciton?
@@ -129,12 +134,19 @@ contract ItemRegistry is Auth, Hash, Salt, EIP712, Signatures {
     }
 
     // Passing in bytes(0) for data effectively "deletes" the contents of the item
-    function edit(uint256 userId, bytes32 itemHash, bytes calldata data) external returns (address pointer) {
+    function edit(uint256 userId, bytes32 itemHash, bytes calldata data) public returns (address pointer) {
         // Check authorization status for msg.sender
         address sender = _authorizationCheck(idRegistry, delegateRegistry, msg.sender, userId);    
         // Check user for edit access + process edit
         pointer = _edit(sender, userId, itemHash, data);   
     }    
+
+    function updateItemAdmins(uint256 userId, bytes32 itemHash, uint256[] memory userIds, bool[] memory statuses) public {
+        // Check authorization status for msg.sender
+        address sender = _authorizationCheck(idRegistry, delegateRegistry, msg.sender, userId); 
+        // Check user for updateAdmins access + process updateAdmins
+        _updateAdmins(sender, userId, itemHash, userIds, statuses);
+    } 
 
     //////////////////////////////////////////////////
     // SIGNATURE BASED WRITES
@@ -205,6 +217,23 @@ contract ItemRegistry is Auth, Hash, Salt, EIP712, Signatures {
         pointer = _edit(authorizedSigner, userId, itemHash, data);                     
     }    
 
+    function updateItemAdminsFor(
+        address signer,
+        uint256 userId, 
+        bytes32 itemHash, 
+        uint256[] memory userIds, 
+        bool[] memory statuses,
+        uint256 deadline,
+        bytes calldata sig
+    ) public {
+        // Verify valid transaction being generated on behalf of signer
+        _verifyUpdateAdminsSig(signer, userId, itemHash, userIds, statuses, deadline, sig);
+        // Check authorization status for msg.sender
+        address authorizedSigner = _authorizationCheck(idRegistry, delegateRegistry, signer, userId);         
+        // Check user for updateAdmins access + process updateAdmins
+        _updateAdmins(authorizedSigner, userId, itemHash, userIds, statuses);
+    }     
+
     //////////////////////////////////////////////////
     // READS
     //////////////////////////////////////////////////           
@@ -237,7 +266,7 @@ contract ItemRegistry is Auth, Hash, Salt, EIP712, Signatures {
             itemHashes[i] = _generateHash(userId, ++itemCountForUser[userId], ITEM_SALT);
             // Store item data
             pointers[i] = dataForItem[itemHashes[i]] = SSTORE2.write(newItemInputs[i].data); 
-            // Set item creator     
+            // Set item admin     
             isAdminForItem[itemHashes[i]][userId] = true;                                       
             // Check for user add access + process add to channel(s)
             for (uint256 j; j < newItemInputs[i].channels.length; ++j) {
@@ -285,6 +314,25 @@ contract ItemRegistry is Auth, Hash, Salt, EIP712, Signatures {
         emit Edit(sender, userId, itemHash, pointer);  
     }         
 
+    function _updateAdmins(
+        address sender,
+        uint256 userId,
+        bytes32 itemHash,
+        uint256[] memory userIds,
+        bool[] memory statuses
+    ) internal {
+        // Check for valid inputs
+        if (userIds.length != statuses.length) revert Input_Length_Mismatch();
+        // Check if userId is admin
+        if (!isAdminForItem[itemHash][userId]) revert Only_Admin();
+        // Update admin statuses for specified userIds         
+        for (uint256 i; i < userIds.length; ++i) {
+            isAdminForItem[itemHash][userIds[i]] = statuses[i];                                       
+        }    
+        // Emit for indexing
+        emit UpdateAdmins(sender, userId, itemHash, userIds, statuses);
+    }
+        
     //////////////////////////////////////////////////
     // SIGNATURES
     ////////////////////////////////////////////////// 
@@ -351,4 +399,28 @@ contract ItemRegistry is Auth, Hash, Salt, EIP712, Signatures {
             sig
         );
     }     
+
+    function _verifyUpdateAdminsSig(
+        address signer, 
+        uint256 userId, 
+        bytes32 itemHash,
+        uint256[] memory userIds,
+        bool[] memory stauses,
+        uint256 deadline, 
+        bytes memory sig
+    ) internal view {
+        _verifySig(
+            _hashTypedDataV4(keccak256(abi.encode(
+                UPDATE_ADMINS_TYPEHASH, 
+                userId, 
+                itemHash, 
+                userIds, 
+                stauses, 
+                deadline
+            ))),
+            signer,
+            deadline,
+            sig
+        );
+    }       
 }
