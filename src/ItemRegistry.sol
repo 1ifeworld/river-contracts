@@ -117,35 +117,23 @@ contract ItemRegistry is Auth, Hash, Salt, EIP712, Signatures {
     function add(uint256 userId, bytes32 itemHash, bytes32 channelHash) public {
         // Check authorization status for msg.sender
         address sender = _authorizationCheck(idRegistry, delegateRegistry, msg.sender, userId);
-        // Check for add access
-        if (!channelRegistry.getAddAccess(userId, channelHash)) revert No_Add_Access();
-        // Add to channel      
-        _unsafeAddToChannel(sender, userId, itemHash, channelHash);
+        // Check user for add access + process add
+        _add(sender, userId, itemHash, channelHash);
     }
 
     function remove(uint256 userId, bytes32 itemHash, bytes32 channelHash) public {
         // Check authorization status for msg.sender
         address sender = _authorizationCheck(idRegistry, delegateRegistry, msg.sender, userId);
-        // Check for remove access
-        if (userId != addedItemToChannel[itemHash][channelHash]) {
-            if (channelRegistry.getRemoveAccess(userId, channelHash)) {
-                revert No_Remove_Access();
-            }
-        } 
-        // Remove from channel      
-        _unsafeRemoveFromChannel(sender, userId, itemHash, channelHash);        
+        // Check user for remove access + process remove
+        _remove(sender, userId, itemHash, channelHash);        
     }
 
     // Passing in bytes(0) for data effectively "deletes" the contents of the item
     function edit(uint256 userId, bytes32 itemHash, bytes calldata data) external returns (address pointer) {
         // Check authorization status for msg.sender
-        address sender = _authorizationCheck(idRegistry, delegateRegistry, msg.sender, userId);
-        // Check that user is item admin
-        if (!isAdminForItem[itemHash][userId]) revert No_Edit_Access();        
-        // Edit data stored for item
-        pointer = dataForItem[itemHash] = SSTORE2.write(data);
-        // Emit for indexing
-        emit Edit(sender, userId, itemHash, pointer);
+        address sender = _authorizationCheck(idRegistry, delegateRegistry, msg.sender, userId);    
+        // Check user for edit access + process edit
+        pointer = _edit(sender, userId, itemHash, data);   
     }    
 
     //////////////////////////////////////////////////
@@ -180,10 +168,8 @@ contract ItemRegistry is Auth, Hash, Salt, EIP712, Signatures {
         _verifyAddSig(signer, userId, itemHash, channelHash, deadline, sig);        
         // Check authorization status for signer
         address authorizedSigner = _authorizationCheck(idRegistry, delegateRegistry, signer, userId);
-        // Check for add access
-        if (!channelRegistry.getAddAccess(userId, channelHash)) revert No_Add_Access();
-        // Add to channel      
-        _unsafeAddToChannel(authorizedSigner, userId, itemHash, channelHash);
+        // Check user for add access + process add
+        _add(authorizedSigner, userId, itemHash, channelHash);
     }        
 
     function removeFor(
@@ -198,14 +184,8 @@ contract ItemRegistry is Auth, Hash, Salt, EIP712, Signatures {
         _verifyRemoveSig(signer, userId, itemHash, channelHash, deadline, sig);          
         // Check authorization status for msg.sender
         address authorizedSigner = _authorizationCheck(idRegistry, delegateRegistry, signer, userId);
-        // Check for remove access
-        if (userId != addedItemToChannel[itemHash][channelHash]) {
-            if (channelRegistry.getRemoveAccess(userId, channelHash)) {
-                revert No_Remove_Access();
-            }
-        } 
-        // Remove from channel      
-        _unsafeRemoveFromChannel(authorizedSigner, userId, itemHash, channelHash);        
+        // Check user for remove access + process remove
+        _remove(authorizedSigner, userId, itemHash, channelHash);       
     }    
 
     // Passing in bytes(0) for data effectively "deletes" the contents of the item
@@ -221,12 +201,8 @@ contract ItemRegistry is Auth, Hash, Salt, EIP712, Signatures {
         _verifyEditSig(signer, userId, itemHash, data, deadline, sig);         
         // Check authorization status for msg.sender
         address authorizedSigner = _authorizationCheck(idRegistry, delegateRegistry, signer, userId);
-        // Check that user is item admin
-        if (!isAdminForItem[itemHash][userId]) revert No_Edit_Access();        
-        // Edit data stored for item
-        pointer = dataForItem[itemHash] = SSTORE2.write(data);
-        // Emit for indexing
-        emit Edit(authorizedSigner, userId, itemHash, pointer);
+        // Check user for edit access + process edit
+        pointer = _edit(authorizedSigner, userId, itemHash, data);                     
     }    
 
     //////////////////////////////////////////////////
@@ -263,35 +239,51 @@ contract ItemRegistry is Auth, Hash, Salt, EIP712, Signatures {
             pointers[i] = dataForItem[itemHashes[i]] = SSTORE2.write(newItemInputs[i].data); 
             // Set item creator     
             isAdminForItem[itemHashes[i]][userId] = true;                                       
-            // Add item to channel(s)
+            // Check for user add access + process add to channel(s)
             for (uint256 j; j < newItemInputs[i].channels.length; ++j) {
-                if (!channelRegistry.getAddAccess(userId, newItemInputs[i].channels[j])) revert No_Add_Access();
-                _unsafeAddToChannel(sender, userId, itemHashes[i], newItemInputs[i].channels[j]);
+                _add(sender, userId, itemHashes[i], newItemInputs[i].channels[j]);
             }          
         }    
         // Emit data for indexing
         emit New(sender, userId, itemHashes, pointers);        
     }         
 
-    function _unsafeAddToChannel(
+    function _add(
         address sender, 
         uint256 userId, 
         bytes32 itemHash,
         bytes32 channelHash
     ) internal {
+        if (!channelRegistry.getAddAccess(userId, channelHash)) revert No_Add_Access();        
         addedItemToChannel[itemHash][channelHash] = userId;
         emit Add(sender, userId, itemHash, channelHash);
-    }    
+    }       
 
-    function _unsafeRemoveFromChannel(
+    function _remove(
         address sender, 
         uint256 userId, 
         bytes32 itemHash,
         bytes32 channelHash
     ) internal {
+        if (userId != addedItemToChannel[itemHash][channelHash]) {
+            if (channelRegistry.getRemoveAccess(userId, channelHash)) {
+                revert No_Remove_Access();
+            }
+        }            
         delete addedItemToChannel[itemHash][channelHash];
         emit Remove(sender, userId, itemHash, channelHash);
     }        
+
+    function _edit(
+        address sender, 
+        uint256 userId, 
+        bytes32 itemHash,
+        bytes calldata data
+    ) internal returns (address pointer) {
+        if (!isAdminForItem[itemHash][userId]) revert No_Edit_Access();          
+        pointer = dataForItem[itemHash] = SSTORE2.write(data);
+        emit Edit(sender, userId, itemHash, pointer);  
+    }         
 
     //////////////////////////////////////////////////
     // SIGNATURES
