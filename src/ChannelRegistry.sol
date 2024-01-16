@@ -18,8 +18,7 @@ contract ChannelRegistry is Auth, Hash, Salt {
     // ERRORS
     //////////////////////////////////////////////////     
 
-    error Input_Length_Mismatch();  
-    error Unuathorized_Sender();      
+    error Input_Length_Mismatch();     
 
     //////////////////////////////////////////////////
     // EVENTS
@@ -49,6 +48,9 @@ contract ChannelRegistry is Auth, Hash, Salt {
     //////////////////////////////////////////////////
     // WRITES
     //////////////////////////////////////////////////  
+
+    // TODO: add ability to update channel uri
+    // TODO: add ability to update channel logic    
     
     // can change the "creatorForChannel" mapping into a "logicForChannel" mapping that stores
     // address of a logic contract that is initialied with generic bytes data

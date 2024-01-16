@@ -11,7 +11,6 @@ import {Auth} from "./utils/Auth.sol";
 import {Hash} from "./utils/Hash.sol";
 import {Salt} from "./utils/Salt.sol";
 
-
 /**
  * @title ItemRegistry
  * @author Lifeworld
@@ -31,16 +30,17 @@ contract ItemRegistry is Auth, Hash, Salt {
     // ERRORS
     //////////////////////////////////////////////////        
 
-    error Unuathorized_Sender();
     error No_Add_Access();
     error No_Remove_Access();
+    error Item_Not_In_Channel();
     error No_Edit_Access();
+    
 
     //////////////////////////////////////////////////
     // EVENTS
     //////////////////////////////////////////////////           
 
-    event NewItems(address sender, uint256 userId, bytes32[] itemHashes, address[] pointers); 
+    event New(address sender, uint256 userId, bytes32[] itemHashes, address[] pointers); 
     event Add(address sender, uint256 userId, bytes32 itemHash, bytes32 channelHash);    
     event Remove(address sender, uint256 userId, bytes32 itemHash, bytes32 channelHash);
     event Edit(address sender, uint256 userId, bytes32 itemHash, address pointer); 
@@ -54,6 +54,7 @@ contract ItemRegistry is Auth, Hash, Salt {
     ChannelRegistry public channelRegistry;    
 
     mapping(uint256 userId => uint256 itemCount) public itemCountForUser;
+    mapping(bytes32 itemHash => uint256 userId) public creatorForItem;
     mapping(bytes32 itemHash => mapping(uint256 userId => bool status)) public isAdminForItem;
     mapping(bytes32 itemHash => address pointer) public dataForItem;
     mapping(bytes32 itemHash => mapping(bytes32 channelHash => uint256 userId)) public addedItemToChannel;
@@ -72,6 +73,12 @@ contract ItemRegistry is Auth, Hash, Salt {
     // WRITES
     //////////////////////////////////////////////////       
 
+    // TODO: add ability to upadte admins for a given item
+    // TODO: batch add function?
+    // TODO: batch edit function?
+    // TODO: batch remove funciton?
+    // TODO: make function(s) external?
+
     // NOTE: consider adding arbitrary data field to newItemInputs to enable signature based access control for channels
     function newItems(uint256 userId, NewItem[] memory newItemInputs) 
         public 
@@ -88,8 +95,8 @@ contract ItemRegistry is Auth, Hash, Salt {
             itemHashes[i] = _generateHash(userId, ++itemCountForUser[userId], ITEM_SALT);
             // Store item data
             pointers[i] = dataForItem[itemHashes[i]] = SSTORE2.write(newItemInputs[i].data); 
-            // Set initial item admin     
-            isAdminForItem[itemHashes[i]][userId] = true;                 
+            // Set item creator     
+            isAdminForItem[itemHashes[i]][userId] = true;                                       
             // Add item to channel(s)
             for (uint256 j; j < newItemInputs[i].channels.length; ++j) {
                 if (!channelRegistry.getAddAccess(userId, newItemInputs[i].channels[j])) revert No_Add_Access();
@@ -97,7 +104,7 @@ contract ItemRegistry is Auth, Hash, Salt {
             }          
         }    
         // Emit data for indexing
-        emit NewItems(sender, userId, itemHashes, pointers);
+        emit New(sender, userId, itemHashes, pointers);
     }
 
     // Adds existing item to an existing channel
@@ -107,6 +114,8 @@ contract ItemRegistry is Auth, Hash, Salt {
         address sender = _authorizationCheck(idRegistry, delegateRegistry, msg.sender, userId);
         // Check for add access
         if (!channelRegistry.getAddAccess(userId, channelHash)) revert No_Add_Access();
+        // Check if itemHash exists
+
         // Add to channel      
         _unsafeAddToChannel(sender, userId, itemHash, channelHash);
     }
@@ -135,13 +144,6 @@ contract ItemRegistry is Auth, Hash, Salt {
         // Emit for indexing
         emit Edit(sender, userId, itemHash, pointer);
     }    
-
-    /*
-    *
-        NOTE:
-        add ability to add/remove admins on specific items
-    *
-    */
 
     // potentially add a check here to make sure the item exists
     function _unsafeAddToChannel(
