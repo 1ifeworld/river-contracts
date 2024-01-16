@@ -6,7 +6,7 @@ pragma solidity 0.8.23;
  * @author Lifeworld
  */
 interface ILogic {
-    function canAdd(uint256 channelId, uint256 userId) external view returns (bool);
-    function canRemove(uint256 channelId, uint256 userId) external view returns (bool);
-    function initializeWithData(uint256 userId, uint256 channelId, bytes memory data) external;
+    function canAdd(uint256 userId, bytes32 channelhash) external view returns (bool);
+    function canRemove(uint256 userId, bytes32 channelHash) external view returns (bool);
+    function initializeWithData(uint256 userId, bytes32 channelHash, bytes memory data) external;
 }

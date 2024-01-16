@@ -32,14 +32,15 @@ contract FullTestScript is Script {
         // register id
         // idRegistry.register(address(0));
         // prep data for new channel
+        uint256 userId = 1;
         uint256[] memory userIds = new uint256[](1);
-        userIds[0] = 1;
+        userIds[0] = userId;
         RoleBasedAccess.Roles[] memory roles = new RoleBasedAccess.Roles[](1);
         roles[0] = RoleBasedAccess.Roles.ADMIN;
         bytes memory logicInit = abi.encode(userIds, roles);
         // create new channel
-        channelRegistry.newChannel(
-            1,
+        bytes32 channelHash = channelRegistry.newChannel(
+            userId,
             "ipfs://bafybeiczsscdsbs7ffqz55asqdf3smv6klcw3gofszvwlyarci47bgf354",
             address(roleBasedAccess),
             logicInit
@@ -48,11 +49,11 @@ contract FullTestScript is Script {
         ItemRegistry.NewItem[] memory newItemInput = new ItemRegistry.NewItem[](1);
         // packs data so that [:20] == address of renderer, [20:] == bytes for renderer to decode into string
         newItemInput[0].data = abi.encodePacked(address(stringRenderer), bytes("ipfs://bafybeiczsscdsbs7ffqz55asqdf3smv6klcw3gofszvwlyarci47bgf354"));
-        uint256[] memory channels = new uint256[](1);
-        channels[0] = 1;        
+        bytes32[] memory channels = new bytes32[](1);
+        channels[0] = channelHash;        
         newItemInput[0].channels = channels;
         // new item
-        itemRegistry.newItems(1, newItemInput);        
+        itemRegistry.newItems(userId, newItemInput);        
         //                 
         vm.stopBroadcast();
     }

@@ -1,4 +1,4 @@
-// // SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.13;
 
 import "forge-std/Script.sol";
@@ -29,13 +29,13 @@ contract RiverSetupScript is Script {
 
         vm.startBroadcast(deployerPrivateKey);
         
-        // idRegistry = new IdRegistry();  
-        // delegateRegistry = new DelegateRegistry();          
+        idRegistry = new IdRegistry();  
+        delegateRegistry = new DelegateRegistry();          
         channelRegistry = new ChannelRegistry(address(idRegistry), address(delegateRegistry));  
         itemRegistry = new ItemRegistry(address(idRegistry), address(delegateRegistry), address(channelRegistry));  
         roleBasedAccess = new RoleBasedAccess(address(idRegistry), address(delegateRegistry));  
-        // stringRenderer = new StringRenderer();  
-        // nftRenderer = new NftRenderer();      
+        stringRenderer = new StringRenderer();  
+        nftRenderer = new NftRenderer();      
 
         vm.stopBroadcast();
     }
