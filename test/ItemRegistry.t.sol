@@ -147,6 +147,36 @@ contract ItemRegistryTest is Test {
         assertEq(itemRegistry.addedItemToChannel(itemHash, firstChannelHash), registeredUserId);
     }    
 
+    function test_sigBased_batchAddFor() public {
+        // prank into relay -- not the user
+        vm.startPrank(relayer.addr);
+        // prep data for add
+        bytes32 itemHash = keccak256("itemHash");
+        bytes32[] memory channelHashes = new bytes32[](2);
+        channelHashes[0] = firstChannelHash;
+        channelHashes[1] = firstChannelHash;
+        // generate signature for addFor call
+        bytes memory signature = _signAddBatchFor(
+            user.key,
+            registeredUserId,
+            itemHash,
+            channelHashes,
+            _deadline()
+        );
+        // addBatch
+        itemRegistry.addBatchFor(
+            user.addr,
+            registeredUserId,
+            itemHash,
+            channelHashes,
+            _deadline(),
+            signature
+        );
+        // test batchAdd for
+        // NOTE: a better test would try add the item to a second channel rather than a duplicate in the function
+        assertEq(itemRegistry.addedItemToChannel(itemHash, firstChannelHash), registeredUserId);
+    }        
+
     function test_sigBased_removeFor() public {
         // prank into relay -- not the user
         vm.startPrank(relayer.addr);
@@ -335,6 +365,19 @@ contract ItemRegistryTest is Test {
         );
         signature = _sign(pk, digest);
     }      
+
+    function _signAddBatchFor(
+        uint256 pk,
+        uint256 userId,
+        bytes32 itemHash,
+        bytes32[] memory channelHashes,
+        uint256 deadline
+    ) internal returns (bytes memory signature) {
+        bytes32 digest = itemRegistry.hashTypedDataV4(
+            keccak256(abi.encode(itemRegistry.ADD_BATCH_TYPEHASH(), userId, itemHash, channelHashes, deadline))
+        );
+        signature = _sign(pk, digest);
+    }          
 
     function _signRemoveFor(
         uint256 pk,

@@ -63,7 +63,10 @@ contract ItemRegistry is Auth, Hash, Salt, EIP712, Signatures {
         keccak256("NewItems(uint256 userId,NewItem[] newItemInputs,uint256 deadline)");   
 
     bytes32 public constant ADD_TYPEHASH =
-        keccak256("Add(uint256 userId,bytes32 itemHash,bytes32 channelHash,uint256 deadline)");        
+        keccak256("Add(uint256 userId,bytes32 itemHash,bytes32 channelHash,uint256 deadline)");       
+
+    bytes32 public constant ADD_BATCH_TYPEHASH =
+        keccak256("Add(uint256 userId,bytes32 itemHash,bytes32[] channelHashes,uint256 deadline)");                  
 
     bytes32 public constant REMOVE_TYPEHASH =
         keccak256("Remove(uint256 userId,bytes32 itemHash,bytes32 channelHash,uint256 deadline)");              
@@ -125,6 +128,17 @@ contract ItemRegistry is Auth, Hash, Salt, EIP712, Signatures {
         _add(sender, userId, itemHash, channelHash);
     }
 
+    // NOTE: consider adding arbitrary data field here to enable signature based access control
+    // Adds existing item to an existing channel
+    function addBatch(uint256 userId, bytes32 itemHash, bytes32[] calldata channelHashes) public {
+        // Check authorization status for msg.sender
+        address sender = _authorizationCheck(idRegistry, delegateRegistry, msg.sender, userId);
+        // Check user for add access + process add
+        for (uint256 i; i < channelHashes.length; ++i) {
+            _add(sender, userId, itemHash, channelHashes[i]);
+        }
+    }    
+
     function remove(uint256 userId, bytes32 itemHash, bytes32 channelHash) public {
         // Check authorization status for msg.sender
         address sender = _authorizationCheck(idRegistry, delegateRegistry, msg.sender, userId);
@@ -182,6 +196,24 @@ contract ItemRegistry is Auth, Hash, Salt, EIP712, Signatures {
         // Check user for add access + process add
         _add(authorizedSigner, userId, itemHash, channelHash);
     }        
+
+    function addBatchFor(
+        address signer, 
+        uint256 userId, 
+        bytes32 itemHash, 
+        bytes32[] calldata channelHashes,         
+        uint256 deadline, 
+        bytes calldata sig
+    ) public {
+        // Verify valid transaction being generated on behalf of signer
+        _verifyAddBatchSig(signer, userId, itemHash, channelHashes, deadline, sig);        
+        // Check authorization status for signer
+        address authorizedSigner = _authorizationCheck(idRegistry, delegateRegistry, signer, userId);
+        // Check user for add access + process add
+        for (uint256 i; i < channelHashes.length; ++i) {
+            _add(authorizedSigner, userId, itemHash, channelHashes[i]);
+        }            
+    }           
 
     function removeFor(
         address signer, 
@@ -366,6 +398,22 @@ contract ItemRegistry is Auth, Hash, Salt, EIP712, Signatures {
             sig
         );
     }  
+
+    function _verifyAddBatchSig(
+        address signer, 
+        uint256 userId, 
+        bytes32 itemHash,
+        bytes32[] calldata channelHashes,
+        uint256 deadline, 
+        bytes memory sig
+    ) internal view {
+        _verifySig(
+            _hashTypedDataV4(keccak256(abi.encode(ADD_BATCH_TYPEHASH, userId, itemHash, channelHashes, deadline))),
+            signer,
+            deadline,
+            sig
+        );
+    }             
 
     function _verifyRemoveSig(
         address signer, 
