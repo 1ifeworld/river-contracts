@@ -103,10 +103,10 @@ contract ItemRegistry is Auth, Hash, Salt, EIP712, Signatures {
     // DIRECT WRITES
     //////////////////////////////////////////////////       
 
-    // TODO: batch add function?
     // TODO: batch edit function?
     // TODO: batch remove funciton?
     // TODO: make function(s) external?
+    // TODO: sort function?
 
     // NOTE: consider adding arbitrary data field to newItemInputs to enable signature based access control for channels
     function newItems(uint256 userId, NewItem[] memory newItemInputs) 
