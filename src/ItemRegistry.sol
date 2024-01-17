@@ -72,7 +72,7 @@ contract ItemRegistry is Auth, Hash, Salt, EIP712, Signatures {
         keccak256("Edit(uint256 userId,bytes32 itemHash,bytes data,uint256 deadline)");    
 
     bytes32 public constant UPDATE_ADMINS_TYPEHASH =
-        keccak256("Edit(uint256 userId,bytes32 itemHash,uint256[] userIds,bool[] statuses,uint256 deadline)");                            
+        keccak256("UpdateAdmins(uint256 userId,bytes32 itemHash,uint256[] userIds,bool[] statuses,uint256 deadline)");                            
 
     //////////////////////////////////////////////////
     // STORAGE
@@ -82,7 +82,6 @@ contract ItemRegistry is Auth, Hash, Salt, EIP712, Signatures {
     DelegateRegistry public delegateRegistry;    
     ChannelRegistry public channelRegistry;    
     mapping(uint256 userId => uint256 itemCount) public itemCountForUser;
-    mapping(bytes32 itemHash => uint256 userId) public creatorForItem;
     mapping(bytes32 itemHash => mapping(uint256 userId => bool status)) public isAdminForItem;
     mapping(bytes32 itemHash => address pointer) public dataForItem;
     mapping(bytes32 itemHash => mapping(bytes32 channelHash => uint256 userId)) public addedItemToChannel;
@@ -141,7 +140,7 @@ contract ItemRegistry is Auth, Hash, Salt, EIP712, Signatures {
         pointer = _edit(sender, userId, itemHash, data);   
     }    
 
-    function updateItemAdmins(uint256 userId, bytes32 itemHash, uint256[] memory userIds, bool[] memory statuses) public {
+    function updateAdmins(uint256 userId, bytes32 itemHash, uint256[] memory userIds, bool[] memory statuses) public {
         // Check authorization status for msg.sender
         address sender = _authorizationCheck(idRegistry, delegateRegistry, msg.sender, userId); 
         // Check user for updateAdmins access + process updateAdmins
@@ -217,7 +216,7 @@ contract ItemRegistry is Auth, Hash, Salt, EIP712, Signatures {
         pointer = _edit(authorizedSigner, userId, itemHash, data);                     
     }    
 
-    function updateItemAdminsFor(
+    function updateAdminsFor(
         address signer,
         uint256 userId, 
         bytes32 itemHash, 
@@ -267,14 +266,14 @@ contract ItemRegistry is Auth, Hash, Salt, EIP712, Signatures {
             // Store item data
             pointers[i] = dataForItem[itemHashes[i]] = SSTORE2.write(newItemInputs[i].data); 
             // Set item admin     
-            isAdminForItem[itemHashes[i]][userId] = true;                                       
+            isAdminForItem[itemHashes[i]][userId] = true;       
+            // Emit `new` data for indexing
+            emit New(sender, userId, itemHashes, pointers);                                                  
             // Check for user add access + process add to channel(s)
             for (uint256 j; j < newItemInputs[i].channels.length; ++j) {
                 _add(sender, userId, itemHashes[i], newItemInputs[i].channels[j]);
             }          
         }    
-        // Emit data for indexing
-        emit New(sender, userId, itemHashes, pointers);        
     }         
 
     function _add(
