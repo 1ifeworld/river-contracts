@@ -68,6 +68,7 @@ contract ItemRegistryTest is Test {
         // register id to user
         registeredUserId = idRegistry.register(address(0));
         // prep create channel for user
+        bytes memory channelData = abi.encodePacked(address(stringRenderer), ipfsBytes);
         uint256[] memory userIds = new uint256[](1);
         userIds[0] = registeredUserId;
         RoleBasedAccess.Roles[] memory roles = new RoleBasedAccess.Roles[](1);
@@ -76,7 +77,7 @@ contract ItemRegistryTest is Test {
         // create new channel
         firstChannelHash = channelRegistry.newChannel(
             registeredUserId,
-            ipfsString,
+            channelData,
             address(roleBasedAccess),
             logicInit
         );        

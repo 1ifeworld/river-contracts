@@ -5,9 +5,9 @@ import {Nonces as NoncesBase} from "openzeppelin-contracts/utils/Nonces.sol";
 import {INonces} from "../interfaces/abstract/INonces.sol";
 
 abstract contract Nonces is INonces, NoncesBase {
-    /*//////////////////////////////////////////////////////////////
-                          NONCE MANAGEMENT
-    //////////////////////////////////////////////////////////////*/
+    //////////////////////////////////////////////////
+    // NONCE MANAGEMENT
+    ////////////////////////////////////////////////// 
 
     /**
      * @inheritdoc INonces
