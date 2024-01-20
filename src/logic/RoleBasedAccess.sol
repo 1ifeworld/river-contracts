@@ -3,12 +3,14 @@ pragma solidity 0.8.23;
 
 import {IdRegistry} from "../IdRegistry.sol";
 import {DelegateRegistry} from "../DelegateRegistry.sol";
+import {Auth} from "../abstract/Auth.sol";
+import {ILogic} from "../interfaces/ILogic.sol";
 
 /**
  * @title RoleBasedAccess
  * @author Lifeworld 
  */
-contract RoleBasedAccess {
+contract RoleBasedAccess is ILogic, Auth {
 
     //////////////////////////////////////////////////
     // TYPES
@@ -25,7 +27,6 @@ contract RoleBasedAccess {
     //////////////////////////////////////////////////  
 
     error Input_Length_Mismatch();  
-    error Unauthorized_Signer_For_User(uint256 userId);
     error Only_Admin();  
 
     //////////////////////////////////////////////////
@@ -76,12 +77,8 @@ contract RoleBasedAccess {
     // NOTE: have weird thing where you need to specify target since initializeWithData route 
     //       means setting that as base variable for mapping
     function editRoles(address target, uint256 userId, uint256[] memory userIds, bytes32 channelHash, Roles[] memory roles) external {  
-        // Cache msg.sender
-        address sender = msg.sender;         
-        // Check that sender has write access for userId
-        if (sender != idRegistry.custodyOf(userId) 
-            && sender != delegateRegistry.delegateOf(userId)
-        ) revert Unauthorized_Signer_For_User(userId);          
+        // Check userId authorization for msg.sender
+        address sender = _authorizationCheck(idRegistry, delegateRegistry, msg.sender, userId);
         // Check for valid inputs
         if (userIds.length != roles.length) revert Input_Length_Mismatch();
         // Set roles
@@ -97,15 +94,19 @@ contract RoleBasedAccess {
     // READS
     //////////////////////////////////////////////////    
 
-    function canAdd(uint256 userId, bytes32 channelHash) external view returns (bool) {
-        return userRoleForChannel[msg.sender][userId][channelHash] < Roles.MEMBER ? false : true;
+    function canReplace(uint256 userId, bytes32 uid, bytes memory /*data*/) external view returns (bool) {
+        return userRoleForChannel[msg.sender][userId][uid] < Roles.ADMIN ? false : true;
+    }        
+
+    function canUpdate(uint256 userId, bytes32 uid, bytes memory /*data*/) external view returns (bool) {
+        return userRoleForChannel[msg.sender][userId][uid] < Roles.ADMIN ? false : true;
+    }        
+
+    function canAdd(uint256 userId, bytes32 uid, bytes memory /*data*/) external view returns (bool) {
+        return userRoleForChannel[msg.sender][userId][uid] < Roles.MEMBER ? false : true;
     }
 
-    function canRemove(uint256 userId, bytes32 channelHash) external view returns (bool) {
-        return userRoleForChannel[msg.sender][userId][channelHash] < Roles.ADMIN ? false : true;
+    function canRemove(uint256 userId, bytes32 uid, bytes memory /*data*/) external view returns (bool) {
+        return userRoleForChannel[msg.sender][userId][uid] < Roles.ADMIN ? false : true;
     }
-
-    function canUpdateLogic(uint256 userId, bytes32 channelHash) external view returns (bool) {
-        return userRoleForChannel[msg.sender][userId][channelHash] < Roles.ADMIN ? false : true;
-    }    
 }

@@ -2,12 +2,9 @@
 pragma solidity 0.8.23;
 
 import "sstore2/SSTORE2.sol";
-import "solidity-bytes-utils/BytesLib.sol";
 import {IdRegistry} from "./IdRegistry.sol";
 import {DelegateRegistry} from "./DelegateRegistry.sol";
-import {DelegateRegistry} from "./DelegateRegistry.sol";
 import {Auth} from "./abstract/Auth.sol";
-import {IRenderer} from "./interfaces/IRenderer.sol";
 import {IStore} from "./interfaces/IStore.sol";
 
 /**
@@ -39,6 +36,7 @@ contract River is Auth {
     // ERRORS
     //////////////////////////////////////////////////
 
+    // Uid is frozen or hasnt been created
     error Invalid_Uid();
     error No_Replace_Access();
     error No_Message_Access();
@@ -59,6 +57,7 @@ contract River is Auth {
     DelegateRegistry public delegateRegistry;
 
     uint256 public uidCount;
+    // TODO: determine if uids should rlly be hashes or if uint256 is better
     mapping(bytes32 uid => address data) public storeForUid;
     mapping(bytes32 uid => uint256 userId) public creatorForUid;
 
@@ -75,9 +74,11 @@ contract River is Auth {
     // WRITES
     //////////////////////////////////////////////////
 
+    // TODO: add freeze? sets creatorForUid to 0
+
     // NOTE: can add sig based version of this func as well
     function newUids(uint256 userId, Init[] calldata inits) external returns (bytes32[] memory uids) {
-        // Check authorization status for msg.sender
+        // Check userId authorization for msg.sender
         address sender = _authorizationCheck(idRegistry, delegateRegistry, msg.sender, userId);
         // Create uids
         for (uint256 i; i < inits.length; ++i) {
@@ -86,8 +87,7 @@ contract River is Auth {
             // Set uid created by
             creatorForUid[uids[i]] = userId;
             // Set + init uid store
-            storeForUid[uids[i]] = inits[i].store;
-            IStore(inits[i].store).initialize(userId, uids[i], inits[i].data);
+            _unsafeStoreInit(userId, uids[i], inits[i].store, inits[i].data);
             // Emit for indexing
             emit NewUid(sender, userId, uids[i], inits[i].store);
         }
@@ -99,27 +99,23 @@ contract River is Auth {
         address sender = _authorizationCheck(idRegistry, delegateRegistry, msg.sender, userId);
         // Process updates
         for (uint256 i; i < updates.length; ++i) {
-            // check if uid exists
+            // Check if uid exists. Will revert if frozen or doesnt exist
             if (creatorForUid[updates[i].uid] == 0) revert Invalid_Uid();
+            // Lookup store address for uid
+            IStore store = IStore(storeForUid[updates[i].uid]);            
             // Check command
             if (updates[i].command == Commands.MESSAGE) {
-                // Lookup store address for uid
-                IStore store = IStore(storeForUid[updates[i].uid]);
-                // Check if user has access to message store for uid
-                if (!store.getMessageAccess(userId, updates[i].uid, updates[i].data)) revert No_Message_Access();
-                // Message store
+                // Message store NOTE: access check will happen in store downstream of this
                 store.message(userId, updates[i].uid, updates[i].data);
                 // Emit for indexing
                 emit Message(sender, userId, updates[i].uid);
             } else if (updates[i].command == Commands.REPLACE) {
-                // Lookup store address for uid
-                IStore store = IStore(storeForUid[updates[i].uid]);
                 // Check if user has access to replace store for uid
                 if (!store.getReplaceAccess(userId, updates[i].uid, updates[i].data)) revert No_Replace_Access();
-                // Extract + set store address from data
-                address newStore = storeForUid[updates[i].uid] = address(bytes20(updates[i].data[0:20]));
-                // Initialize store with data
-                IStore(newStore).initialize(userId, updates[i].uid, updates[i].data[20:]);
+                // Extract store address from data
+                address newStore = address(bytes20(updates[i].data[0:20]));
+                // Set + init uid store
+                _unsafeStoreInit(userId, updates[i].uid, newStore, updates[i].data[20:]);                
                 // Emit for indexing
                 emit Replace(sender, userId, updates[i].uid, newStore);
             }
@@ -137,4 +133,9 @@ contract River is Auth {
     //////////////////////////////////////////////////
     // INTERNAL
     //////////////////////////////////////////////////
+
+    function _unsafeStoreInit(uint256 userId, bytes32 uid, address store, bytes memory data) internal {
+        storeForUid[uid] = store;
+        IStore(store).initializeWithData(userId, uid, data);        
+    }
 }
