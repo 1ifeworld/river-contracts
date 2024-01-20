@@ -63,6 +63,10 @@ contract GenericRegistry is Auth {
             emit RequestUidUpdate(sender, userId, updates[i].uid, updates[i].data);
         }
     }
+
+    function getInitDataForUid(bytes32 uid) external view returns (bytes memory initData) {
+        initData = SSTORE2.read(initForUid[uid]);
+    }
 }
 
 /*
