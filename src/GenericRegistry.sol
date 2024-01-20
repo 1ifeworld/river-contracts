@@ -116,7 +116,6 @@ contract GenericRegistry is Auth {
             ]
         })    
 
-
     Note on updates:
 
     Updates would be processed according to an offchain processing logic defined in an arbitrary schema. 
