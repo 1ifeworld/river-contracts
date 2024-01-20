@@ -35,10 +35,10 @@ contract ChannelStore is IStore {
     //
     function initialize(uint256 userId, bytes32 uid, bytes calldata data) external {
         address sender = msg.sender;
-        (string memory uri, uint256 admin) = abi.decode(data, (string, uint256));
-        uriForUid[sender][uid] = uri;
+        (string memory channelUri, uint256 admin) = abi.decode(data, (string, uint256));
+        uriForUid[sender][uid] = channelUri;
         adminForUid[sender][uid] = admin;
-        emit Initialize(sender, userId, uid, uri, admin);
+        emit Initialize(sender, userId, uid, channelUri, admin);
     }
     // could add a command slicer to this to allow for multiple write pathways
     // can return abi.encoded(data for pathway) + the flag thats decoded to provide generic return
@@ -77,7 +77,10 @@ contract ChannelStore is IStore {
     function getRemoveAccess(uint256 userId, bytes32 uid, bytes memory /*data*/) external view returns (bool) {
         return _isAdmin(msg.sender, userId, uid);
     }    
-    function channelUri(address origin, bytes32 uid) external view returns (string memory uri) {
-        uri = uriForUid[origin][uid];
+    function uri(bytes32 uid) external view returns (string memory) {
+        return uriForUid[msg.sender][uid];
     }    
+    function getUri(address origin, bytes32 uid) external view returns (string memory) {
+        return uriForUid[origin][uid];
+    }          
 }

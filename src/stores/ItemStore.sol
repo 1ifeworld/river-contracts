@@ -93,10 +93,17 @@ contract ItemStore {
         return _isAdmin(msg.sender, userId, itemUid);
     }    
     //
-    function itemUri(address origin, bytes32 itemUid) external view returns (string memory uri) {
+    function uri(bytes32 itemUid) external view returns (string memory) {
+        bytes memory encodedBytes = SSTORE2.read(dataForItem[msg.sender][itemUid]);
+        address renderer = BytesLib.toAddress(encodedBytes, 0);
+        bytes memory data = BytesLib.slice(encodedBytes, 20, (encodedBytes.length - 20));
+        return IRenderer(renderer).render(data);
+    }   
+    //
+    function getUri(address origin, bytes32 itemUid) external view returns (string memory) {
         bytes memory encodedBytes = SSTORE2.read(dataForItem[origin][itemUid]);
         address renderer = BytesLib.toAddress(encodedBytes, 0);
         bytes memory data = BytesLib.slice(encodedBytes, 20, (encodedBytes.length - 20));
-        uri = IRenderer(renderer).render(data);
-    }   
+        return IRenderer(renderer).render(data);
+    }       
 }

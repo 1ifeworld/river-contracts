@@ -82,7 +82,7 @@ contract River is Auth {
         // Create uids
         for (uint256 i; i < inits.length; ++i) {
             // Increment uid count + generate/set uid hash
-            uids[i] = keccak256(++uidCount);
+            uids[i] = keccak256(abi.encode(address(this), ++uidCount));
             // Set uid created by
             creatorForUid[uids[i]] = userId;
             // Set + init uid store
@@ -117,9 +117,9 @@ contract River is Auth {
                 // Check if user has access to replace store for uid
                 if (!store.getReplaceAccess(userId, updates[i].uid, updates[i].data)) revert No_Replace_Access();
                 // Extract + set store address from data
-                address store = storeForUid[updates[i].uid] = address(bytes20(updates[i].data[0:20]));
+                address newStore = storeForUid[updates[i].uid] = address(bytes20(updates[i].data[0:20]));
                 // Initialize store with data
-                IStore(store).initialize(userId, updates[i].uid, updates[i].data[20:]);
+                IStore(newStore).initialize(userId, updates[i].uid, updates[i].data[20:]);
                 // Emit for indexing
                 emit Replace(sender, userId, updates[i].uid, newStore);
             }
@@ -129,6 +129,10 @@ contract River is Auth {
     //////////////////////////////////////////////////
     // READS
     //////////////////////////////////////////////////
+
+    function uri(bytes32 uid) external view returns (string memory) {
+        return IStore(storeForUid[uid]).uri(uid);
+    }   
 
     //////////////////////////////////////////////////
     // INTERNAL
