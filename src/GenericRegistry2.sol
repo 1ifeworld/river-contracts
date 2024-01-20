@@ -14,6 +14,63 @@ interface IStore {
     function getWriteAccess(uint256 userId, bytes32 uid, bytes memory data) external returns (bool);
 }
 
+// interface ILogic {
+//     function initialize(uint256 userId,)
+// }
+
+contract ChannelStore {
+    error OnlyRegistry();
+    error OnlyAdmin();
+    GenericRegistry constant public genericRegistry = 0x95222290DD7278Aa3Ddd389Cc1E1d165CC4BAfe5;
+    mapping(bytes32 uid => string uri) public uriForUid;
+    mapping(bytes32 uid => address admin) public adminForUid;
+    function initialize(uint256 userId, bytes32 uid, bytes calldata data) external {
+        if (msg.sender != address(genericRegistry)) revert OnlyRegistry();
+        (string memory uri, address admin) = abi.decode(data, (string, address));
+        uriForUid[uid] = uri;
+        adminFor[uid] = adminForUid;
+    }
+    // could add a command slicer to this to allow for multiple write pathways
+    // can return abi.encoded(data for pathway) + the flag thats decoded to provide generic return
+    function write(uint256 userId, bytes32 uid, bytes calldata data) external {
+        if (adminForUid[uid] != userId) revert OnlyAdmin();
+        if (data[0:1] == 0) {
+            (string memory newUri) = abi.encode(data[1:], (string));
+            uriForUid[uid] = newUri;
+        } else {
+            (address newAdmin) = abi.encode(data[1:], (string));
+            adminForUid[uid] = newAdmin;            
+        }
+    }
+}
+
+contract ItemStore {
+    error OnlyRegistry();
+    error OnlyAdmin();
+    GenericRegistry constant public genericRegistry = 0x95222290DD7278Aa3Ddd389Cc1E1d165CC4BAfe5;
+    ChannelStore constant public channelStore = 0x15222290DD7278Aa3Ddd389Cc1E1d165CC4BAfe5;
+    // mapping(bytes32 uid => string uri) public uriForUid;
+    // mapping(bytes32 uid => address admin) public adminForUid;
+    // function initialize(uint256 userId, bytes32 uid, bytes calldata data) external {
+    //     if (msg.sender != address(genericRegistry)) revert OnlyRegistry();
+    //     (string memory uri, address admin) = abi.decode(data, (string, address));
+    //     uriForUid[uid] = uri;
+    //     adminFor[uid] = adminForUid;
+    // }
+    // could add a command slicer to this to allow for multiple write pathways
+    // can return abi.encoded(data for pathway) + the flag thats decoded to provide generic return
+    // function write(uint256 userId, bytes32 uid, bytes calldata data) external {
+    //     if (adminForUid[uid] != userId) revert OnlyAdmin();
+    //     if (data[0:1] == 0) {
+    //         (string memory newUri) = abi.encode(data[1:], (string));
+    //         uriForUid[uid] = newUri;
+    //     } else {
+    //         (address newAdmin) = abi.encode(data[1:], (string));
+    //         adminForUid[uid] = newAdmin;            
+    //     }
+    // }
+}
+
 /**
  * @title GenericRegistry2
  * @author Lifeworld
