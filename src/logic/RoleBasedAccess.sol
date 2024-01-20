@@ -105,7 +105,7 @@ contract RoleBasedAccess {
         return userRoleForChannel[msg.sender][userId][channelHash] < Roles.ADMIN ? false : true;
     }
 
-    function canUpdate(uint256 userId, bytes32 channelHash) external view returns (bool) {
+    function canUpdateLogic(uint256 userId, bytes32 channelHash) external view returns (bool) {
         return userRoleForChannel[msg.sender][userId][channelHash] < Roles.ADMIN ? false : true;
     }    
 }

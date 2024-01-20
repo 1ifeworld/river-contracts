@@ -242,7 +242,7 @@ contract ItemRegistryTest is Test {
             _deadline()
         );
         // create item
-        (bytes32[] memory itemHashes, address[] memory pointers) = itemRegistry.newItemsFor(
+        (bytes32[] memory itemHashes,) = itemRegistry.newItemsFor(
             user.addr,
             registeredUserId,
             newItemInput,
@@ -292,7 +292,7 @@ contract ItemRegistryTest is Test {
             _deadline()
         );
         // create item
-        (bytes32[] memory itemHashes, address[] memory pointers) = itemRegistry.newItemsFor(
+        (bytes32[] memory itemHashes,) = itemRegistry.newItemsFor(
             user.addr,
             registeredUserId,
             newItemInput,
