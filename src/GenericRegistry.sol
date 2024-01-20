@@ -126,4 +126,12 @@ contract GenericRegistry is Auth {
     The benefits of this approach is that there is a globally agreeable state of uids that can be used
     across protocols, while the init pattern provides data anchors that can then be built on top of
     by subsequent update calls
+
+    Ideas:
+
+    Could even add to the core logic the ability to specifiy a renderer inside of the init data
+    which would allow for a function called "viewUidInitUri" which would use the renderer stoerd
+    the init data to decode the data into a stringified json of the starting structure. This would
+    be done to provide even better onchain state-based visibility into the starting parameters
+    for a given uid
 */
