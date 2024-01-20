@@ -34,6 +34,7 @@ contract GenericRegistry is Auth {
         delegateRegistry = DelegateRegistry(_delegateRegistry);
     }
 
+    // NOTE: can add sig based version of this func as well
     function newUids(uint256 userId, bytes[] calldata inits)
         external
         returns (bytes32[] memory uids, address[] memory pointers)
@@ -54,6 +55,7 @@ contract GenericRegistry is Auth {
         }
     }
 
+    // NOTE: can add sig based version of this func as well
     function updateUids(uint256 userId, Update[] calldata updates) external {
         // Check authorization status for msg.sender
         address sender = _authorizationCheck(idRegistry, delegateRegistry, msg.sender, userId);
@@ -72,8 +74,10 @@ contract GenericRegistry is Auth {
 /*
     This protocol aims to do the following things
     - provide an evm state based approach to creating + verifying unique identifiers
+        that can represent arbitrary data structures
     - provide a gateway for targeting unique identifiers to issue updates
-    - integrate both create/update paths with a dedicated id/delegate systems
+    - integrate both create/update paths with an id system that ensures
+        all broadcasted data originates from the keys associated with a userId
 
     This allows for
     - state based agreement on uid creation time/origin/data
