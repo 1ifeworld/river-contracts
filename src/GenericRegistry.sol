@@ -138,4 +138,6 @@ contract GenericRegistry is Auth {
     the init data to decode the data into a stringified json of the starting structure. This would
     be done to provide even better onchain state-based visibility into the starting parameters
     for a given uid
+
+    ^could also build this as an extension around the core registry -- which prob makes more sense?
 */
