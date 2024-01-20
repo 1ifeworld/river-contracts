@@ -109,7 +109,7 @@ contract GenericRegistry is Auth {
                 {
                     uid: keccak256("MOCK_SALT"),
                     data: abi.encodePacked(
-                        bytes2(uint256),                    // EX: 101 = Channel_v1_ChannelUpdateType_v1
+                        bytes2(uint16) msgType,             // EX: 101 = Channel_v1_ChannelUpdateType_v1
                         abi.encode(string memory uri)       // EX: "ipfs://aosjdflad93012mnsdfopas02"
                     )
                 }
