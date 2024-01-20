@@ -184,6 +184,10 @@ contract ItemStore {
  * @author Lifeworld
  */
 contract GenericRegistry2 is Auth {
+    struct Init {
+        address store;
+        bytes data;
+    }    
     struct Update {
         bytes32 uid;
         uint8 flag;
@@ -212,7 +216,7 @@ contract GenericRegistry2 is Auth {
     }
 
     // NOTE: can add sig based version of this func as well
-    function newUids(uint256 userId, bytes[] calldata inits)
+    function newUids(uint256 userId, Init[] calldata inits)
         external
         returns (bytes32[] memory uids, address[] memory stores)
     {
@@ -227,8 +231,8 @@ contract GenericRegistry2 is Auth {
             // set uid created by
             creatorForUid[uids[i]] = userId;
             // init data for uid
-            stores[i] = storeForUid[uids[i]] = BytesLib.toAddress(inits[i][0:20], 0);
-            IStore(stores[i]).initialize(userId, uids[i], inits[i][20:]);
+            stores[i] = storeForUid[uids[i]] = inits[i].store;
+            IStore(stores[i]).initialize(userId, uids[i], inits[i].data);
             // Emit for indexing
             emit NewUid(sender, userId, uids[i], stores[i]);
         }
