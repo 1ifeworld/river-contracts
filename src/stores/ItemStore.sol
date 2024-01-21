@@ -58,7 +58,7 @@ contract ItemStore is Auth {
     DelegateRegistry public delegateRegistry;
     mapping(address origin => mapping(bytes32 item => address pointer)) public dataForItem;    
     mapping(address origin => mapping(bytes32 item => uint256 admin)) public adminForItem; 
-    mapping(address origin => mapping(bytes32 item => mapping(bytes32 channel => uint256 userId))) addedItemToChannel;
+    mapping(bytes32 itemUid => mapping(bytes32 channelUid => uint256 userId)) addedItemToChannel;
 
     //////////////////////////////////////////////////
     // CONSTRUCTOR
@@ -88,15 +88,16 @@ contract ItemStore is Auth {
         // Process adds
         for (uint256 i; i < channels.length; ++i) {
             // Check user for add access + process add
-            _unsafeAdd(userId, sender, uid, channel);
+            _unsafeAdd(userId, uid, channel);
         }
     }
 
 
-    function add(uint256 userId, address origin, bytes32 itemUid, Channels[] memory channels) {
+    function add(uint256 userId, bytes32 itemUid, Channel memory channel) {
         // Check userId authorization for msg.sender
         address sender = _authorizationCheck(idRegistry, delegateRegistry, msg.sender, userId);     
         // Check user for add access + process add
+        _unsafeAdd(userId, origin, itemUid, channel);
     }
 
     function _unsafeAdd(
