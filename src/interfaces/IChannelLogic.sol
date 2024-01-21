@@ -8,7 +8,7 @@ import {ILogic} from "./ILogic.sol";
  * @author Lifeworld
  */
 interface IChannelLogic is ILogic {    
-    function canUpdate(uint256 userId, bytes32 uid, bytes memory data) external view returns (bool);
-    function canAdd(uint256 userId, bytes32 channelUid, bytes memory data) external view returns (bool);
-    function canRemove(uint256 userId, bytes32 channelUid, bytes memory data) external view returns (bool);    
+    function settingsAccess(uint256 userId, bytes32 uid) external view returns (bool);
+    function addAccess(uint256 userId, bytes32 channelUid, bytes memory data) external view returns (bool);
+    function removeAccess(uint256 userId, bytes32 channelUid, bytes memory data) external view returns (bool);    
 }

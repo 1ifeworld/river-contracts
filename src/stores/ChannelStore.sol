@@ -15,22 +15,21 @@ import {IChannelLogic} from "../interfaces/IChannelLogic.sol";
  * @author Lifeworld
  */
 contract ChannelStore is Auth, IChannelStore {
-
     //////////////////////////////////////////////////
     // TYPES
     //////////////////////////////////////////////////
 
-    enum Commands {
-        DATA,
-        LOGIC
+    struct Settings {
+        address dataPointer;
+        address logic;
     }
-    
+
     //////////////////////////////////////////////////
     // ERRORS
     //////////////////////////////////////////////////
 
-    error No_Update_Access();
-    
+    error No_Settings_Access();
+
     //////////////////////////////////////////////////
     // EVENTS
     //////////////////////////////////////////////////
@@ -38,15 +37,14 @@ contract ChannelStore is Auth, IChannelStore {
     event Initialize(address sender, uint256 userId, bytes32 uid, address pointer, address logic);
     event Data(address sender, address origin, uint256 userId, bytes32 uid, address pointer);
     event Logic(address sender, address origin, uint256 userId, bytes32 uid, address logic);
-    
+
     //////////////////////////////////////////////////
     // STORAGE
     //////////////////////////////////////////////////
 
     IdRegistry public idRegistry;
     DelegateRegistry public delegateRegistry;
-    mapping(address origin => mapping(bytes32 channelUid => address pointer)) public dataForChannel;
-    mapping(address origin => mapping(bytes32 channelUid => address logic)) public logicForChannel;
+    mapping(address origin => mapping(bytes32 channelUid => Settings)) public settingsForChannel;
 
     //////////////////////////////////////////////////
     // CONSTRUCTOR
@@ -55,8 +53,8 @@ contract ChannelStore is Auth, IChannelStore {
     constructor(address _idRegistry, address _delegateRegistry) {
         idRegistry = IdRegistry(_idRegistry);
         delegateRegistry = DelegateRegistry(_delegateRegistry);
-    }    
-    
+    }
+
     //////////////////////////////////////////////////
     // WRITES
     //////////////////////////////////////////////////
@@ -70,96 +68,109 @@ contract ChannelStore is Auth, IChannelStore {
         // Cache msg.sender
         address sender = msg.sender;
         // Decode incoming data
-        (bytes memory channelData, address logic, bytes memory logicData) = abi.decode(data, (bytes, address, bytes));
+        (bytes memory dataInit, address logic, bytes memory logicInit) = abi.decode(data, (bytes, address, bytes));
         // Store data for channel
-        address pointer = dataForChannel[sender][uid] = SSTORE2.write(channelData);
+        address pointer = _unsafeDataInit(sender, uid, dataInit);
         // Set + initialize logic for channel
-        _unsafeLogicInit(sender, userId, uid, logic, logicData);
-        // Emit for indexing    
+        _unsafeLogicInit(sender, userId, uid, logic, logicInit);
+        // Emit for indexing
         emit Initialize(sender, userId, uid, pointer, logic);
     }
 
-
-    // This is supposed to be called by userId/delegate post initialization. either directly or via
-    //      multicall for batching purposes
-    // TODO: add return abi.encoded(data for command) + decoded command provide generic return???
-    function message(uint256 userId, address origin, bytes32 uid, bytes calldata data) external {
+    function setChannelData(uint256 userId, address origin, bytes32 channelUid, bytes calldata data) external {
         // Check userId authorization for msg.sender
-        address sender = _authorizationCheck(idRegistry, delegateRegistry, msg.sender, userId);        
-        // Check if user can update channelUid
-        if (!IChannelLogic(logicForChannel[origin][uid]).canUpdate(userId, uid, data)) revert No_Update_Access();
-        // Extract command from data
-        uint8 command = uint8(data[0]);                
-        // Process commands
-        _unsafeProcessCommands(sender, origin, userId, uid, command, data);
+        address sender = _authorizationCheck(idRegistry, delegateRegistry, msg.sender, userId);
+        // Check if user has access to set channel data
+        if (!IChannelLogic(settingsForChannel[origin][channelUid].logic).settingsAccess(userId, channelUid)) {
+            revert No_Settings_Access();
+        }
+        // Store data for channel
+        address pointer = _unsafeDataInit(origin, channelUid, data);
+        // Emit for indexing
+        emit Data(sender, origin, userId, channelUid, pointer);
+    }
+
+    function setChannelLogic(
+        uint256 userId,
+        address origin,
+        bytes32 channelUid,
+        address logic,
+        bytes calldata logicInit
+    ) external {
+        // Check userId authorization for msg.sender
+        address sender = _authorizationCheck(idRegistry, delegateRegistry, msg.sender, userId);
+        // Check if user has access to set channel data
+        if (!IChannelLogic(settingsForChannel[origin][channelUid].logic).settingsAccess(userId, channelUid)) {
+            revert No_Settings_Access();
+        }
+        // Set + initialize logic for channel
+        _unsafeLogicInit(sender, userId, channelUid, logic, logicInit);
+        // Emit for indexing
+        emit Logic(sender, origin, userId, channelUid, logic);
     }
 
     //////////////////////////////////////////////////
     // READS
-    //////////////////////////////////////////////////         
+    //////////////////////////////////////////////////
 
-    function uri(bytes32 uid) external view returns (string memory) {    
-        bytes memory encodedData = SSTORE2.read(dataForChannel[msg.sender][uid]);
+    function uri(bytes32 uid) external view returns (string memory) {
+        bytes memory encodedData = SSTORE2.read(settingsForChannel[msg.sender][uid].dataPointer);
         address renderer = address(bytes20(encodedData));
         bytes memory data = BytesLib.slice(encodedData, 20, (encodedData.length - 20));
-        return IRenderer(renderer).render(data);                        
-    }     
+        return IRenderer(renderer).render(data);
+    }
 
     function getUri(address origin, bytes32 uid) external view returns (string memory) {
-        bytes memory encodedData = SSTORE2.read(dataForChannel[origin][uid]);
+        bytes memory encodedData = SSTORE2.read(settingsForChannel[origin][uid].dataPointer);
         address renderer = address(bytes20(encodedData));
         bytes memory data = BytesLib.slice(encodedData, 20, (encodedData.length - 20));
-        return IRenderer(renderer).render(data);    
-    }        
+        return IRenderer(renderer).render(data);
+    }
 
     // TODO: add getters that dont rely on msg.sender
 
-    function getReplaceAccess(uint256 userId, address origin, bytes32 uid, bytes memory data) external view returns (bool) {
-        return IChannelLogic(logicForChannel[origin][uid]).canReplace(userId, uid, data);
-    }  
+    /*
+        ISTORE SPECIFIC
+    */
 
-    function getUpdateAccess(uint256 userId, address origin, bytes32 uid, bytes memory data) external view returns (bool) {
-        return IChannelLogic(logicForChannel[origin][uid]).canUpdate(userId, uid, data);
-    }      
-
-    function getAddAccess(uint256 userId, address origin, bytes32 uid, bytes memory data) external view returns (bool) {
-        return IChannelLogic(logicForChannel[origin][uid]).canAdd(userId, uid, data);
+    function getUpdateAccess(uint256 userId, address origin, bytes32 uid)
+        external
+        view
+        returns (bool)
+    {
+        return IChannelLogic(settingsForChannel[origin][uid].logic).updateAccess(userId, uid);
     }
-    function getRemoveAccess(uint256 userId, address origin, bytes32 uid, bytes memory data) external view returns (bool) {
-        return IChannelLogic(logicForChannel[origin][uid]).canRemove(userId, uid, data);
-    }        
+
+    /*
+        CHANNEL SPECIFIC
+    */
+
+    function getAddAccess(uint256 userId, address origin, bytes32 uid, bytes memory data)
+        external
+        view
+        returns (bool)
+    {
+        return IChannelLogic(settingsForChannel[origin][uid].logic).addAccess(userId, uid, data);
+    }
+
+    function getRemoveAccess(uint256 userId, address origin, bytes32 uid, bytes memory data)
+        external
+        view
+        returns (bool)
+    {
+        return IChannelLogic(settingsForChannel[origin][uid].logic).addAccess(userId, uid, data);
+    }
 
     //////////////////////////////////////////////////
     // INTERNAL
-    //////////////////////////////////////////////////  
+    //////////////////////////////////////////////////
 
-    function _unsafeProcessCommands(
-        address sender, 
-        address origin,
-        uint256 userId, 
-        bytes32 uid, 
-        uint8 command, 
-        bytes calldata data
-    ) internal {
-        if (command == uint8(Commands.DATA)) {
-            // Decode incoming data
-            (bytes memory incomingData) = abi.decode(data[1:], (bytes));
-            // Store data for channel
-            address pointer = dataForChannel[origin][uid] = SSTORE2.write(incomingData);
-            // Emit for indexing
-            emit Data(sender, origin, userId, uid, pointer);
-        } else if (command == uint8(Commands.LOGIC)) {
-            // Decode incoming data
-            (address logic, bytes memory logicData) = abi.decode(data[1:], (address, bytes));
-            // Set + initialize logic for channel
-            _unsafeLogicInit(origin, userId, uid, logic, logicData);
-            // Emit for indexing          
-            emit Logic(sender, origin, userId, uid, logic);
-        }        
-    }    
+    function _unsafeDataInit(address origin, bytes32 channelUid, bytes memory data) internal returns (address) {
+        return settingsForChannel[origin][channelUid].dataPointer = SSTORE2.write(data);
+    }
 
     function _unsafeLogicInit(address origin, uint256 userId, bytes32 uid, address logic, bytes memory data) internal {
-        logicForChannel[origin][uid] = logic;
-        IChannelLogic(logic).initializeWithData(userId, uid, data);        
+        settingsForChannel[origin][uid].logic = logic;
+        IChannelLogic(logic).initializeWithData(userId, uid, data);
     }
 }

@@ -16,6 +16,11 @@ contract River is Auth {
     // TYPES
     //////////////////////////////////////////////////
 
+    struct Info {
+        uint256 creatorId;
+        address store;
+    }
+
     struct Init {
         address store;
         bytes data;
@@ -33,7 +38,7 @@ contract River is Auth {
 
     // Uid is frozen or hasnt been created
     error Invalid_Uid();
-    error No_Replace_Access();
+    error No_Update_Access();
 
     //////////////////////////////////////////////////
     // EVENTS
@@ -51,8 +56,7 @@ contract River is Auth {
 
     uint256 public uidCount;
     // TODO: determine if uids should rlly be hashes or if uint256 is better
-    mapping(bytes32 uid => address data) public storeForUid;
-    mapping(bytes32 uid => uint256 userId) public creatorForUid;
+    mapping(bytes32 uid => Info) public infoForUid;
 
     //////////////////////////////////////////////////
     // CONSTRUCTOR
@@ -78,7 +82,7 @@ contract River is Auth {
             // Increment uid count + generate/set uid hash
             uids[i] = keccak256(abi.encode(address(this), ++uidCount));
             // Set uid created by
-            creatorForUid[uids[i]] = userId;
+            infoForUid[uids[i]].creatorId = userId;
             // Set + init uid store
             _unsafeStoreInit(userId, uids[i], inits[i].store, inits[i].data);
             // Emit for indexing
@@ -93,11 +97,11 @@ contract River is Auth {
         // Process updates
         for (uint256 i; i < updates.length; ++i) {
             // Check if uid exists. Will revert if frozen or doesnt exist
-            if (creatorForUid[updates[i].uid] == 0) revert Invalid_Uid();
+            if (infoForUid[updates[i].uid].creatorId == 0) revert Invalid_Uid();
             // Lookup store address for uid
-            IStore store = IStore(storeForUid[updates[i].uid]);            
+            IStore store = IStore(infoForUid[updates[i].uid].store);            
             // Check if user has access to replace store for uid
-            if (!store.getReplaceAccess(userId, address(this), updates[i].uid, updates[i].data)) revert No_Replace_Access();
+            if (!store.getUpdateAccess(userId, address(this), updates[i].uid)) revert No_Update_Access();
             // Set + init uid store
             _unsafeStoreInit(userId, updates[i].uid, updates[i].store, updates[i].data);                
             // Emit for indexing
@@ -110,7 +114,7 @@ contract River is Auth {
     //////////////////////////////////////////////////
 
     function uri(bytes32 uid) external view returns (string memory) {
-        return IStore(storeForUid[uid]).uri(uid);
+        return IStore(infoForUid[uid].store).uri(uid);
     }   
 
     //////////////////////////////////////////////////
@@ -118,7 +122,7 @@ contract River is Auth {
     //////////////////////////////////////////////////
 
     function _unsafeStoreInit(uint256 userId, bytes32 uid, address store, bytes memory data) internal {
-        storeForUid[uid] = store;
+        infoForUid[uid].store = store;
         IStore(store).initializeWithData(userId, uid, data);        
     }
 }

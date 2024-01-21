@@ -33,7 +33,7 @@ contract RoleBasedAccess is ILogic, Auth {
     // EVENTS
     //////////////////////////////////////////////////  
 
-    event RolesSet(address sender, uint256 userId, uint256[] userIds, bytes32 channelHash, Roles[] roles);
+    event RolesSet(address sender, address origin, uint256 userId, uint256[] targetUserIds, bytes32 channelHash, Roles[] roles);
     
     //////////////////////////////////////////////////
     // STORAGE
@@ -41,7 +41,7 @@ contract RoleBasedAccess is ILogic, Auth {
 
     IdRegistry public idRegistry;
     DelegateRegistry public delegateRegistry;    
-    mapping(address target => mapping(uint256 userId => mapping(bytes32 channelHash => Roles))) public userRoleForChannel;
+    mapping(address origin => mapping(uint256 userId => mapping(bytes32 channelUid => Roles))) public userRoleForChannel;
 
     //////////////////////////////////////////////////
     // CONSTRUCTOR
@@ -56,53 +56,59 @@ contract RoleBasedAccess is ILogic, Auth {
     // WRITES
     //////////////////////////////////////////////////
 
-    function initializeWithData(uint256 userId, bytes32 channelHash, bytes memory data) external {
+    function initializeWithData(uint256 userId, bytes32 channelUid, bytes memory data) external {
         // Cache msg.sender
         address sender = msg.sender;     
         // Decode incoming data
         (
-            uint256[] memory userIds,
+            uint256[] memory targetUserIds,
             Roles[] memory roles
         ) = abi.decode(data, (uint256[], Roles[]));
         // Check for valid inputs
-        if (userIds.length != roles.length) revert Input_Length_Mismatch();
+        if (targetUserIds.length != roles.length) revert Input_Length_Mismatch();
         // Set roles
-        for (uint256 i; i < userIds.length; ++i) {
-            userRoleForChannel[sender][userIds[i]][channelHash] = roles[i];
+        for (uint256 i; i < targetUserIds.length; ++i) {
+            userRoleForChannel[sender][targetUserIds[i]][channelUid] = roles[i];
         }
         // Emit for indexing
-        emit RolesSet(sender, userId, userIds, channelHash, roles);
+        emit RolesSet(sender, sender, userId, targetUserIds, channelUid, roles);
     }
     
-    // NOTE: have weird thing where you need to specify target since initializeWithData route 
-    //       means setting that as base variable for mapping
-    function editRoles(address target, uint256 userId, uint256[] memory userIds, bytes32 channelHash, Roles[] memory roles) external {  
+    function editRoles(address origin, uint256 userId, uint256[] memory targetUserIds, bytes32 channelUid, Roles[] memory roles) external {  
         // Check userId authorization for msg.sender
         address sender = _authorizationCheck(idRegistry, delegateRegistry, msg.sender, userId);
         // Check for valid inputs
-        if (userIds.length != roles.length) revert Input_Length_Mismatch();
+        if (targetUserIds.length != roles.length) revert Input_Length_Mismatch();
         // Set roles
-        for (uint256 i; i < userIds.length; ++i) {
-            if (userRoleForChannel[target][userIds[i]][channelHash] < Roles.ADMIN) revert Only_Admin();
-            userRoleForChannel[target][userIds[i]][channelHash] = roles[i];
+        for (uint256 i; i < targetUserIds.length; ++i) {
+            if (userRoleForChannel[origin][targetUserIds[i]][channelUid] < Roles.ADMIN) revert Only_Admin();
+            userRoleForChannel[origin][targetUserIds[i]][channelUid] = roles[i];
         }
         // Emit for indexing
-        emit RolesSet(sender, userId, userIds, channelHash, roles);        
+        emit RolesSet(sender, origin, userId, targetUserIds, channelUid, roles);        
     }
 
     //////////////////////////////////////////////////
     // READS
     //////////////////////////////////////////////////    
 
-    function canReplace(uint256 userId, bytes32 uid, bytes memory /*data*/) external view returns (bool) {
+    function updateAccess(uint256 userId, bytes32 uid) external view returns (bool) {
         return userRoleForChannel[msg.sender][userId][uid] < Roles.ADMIN ? false : true;
     }        
-
-    function canAdd(uint256 userId, bytes32 uid, bytes memory /*data*/) external view returns (bool) {
+    function addAccess(uint256 userId, bytes32 uid) external view returns (bool) {
         return userRoleForChannel[msg.sender][userId][uid] < Roles.MEMBER ? false : true;
     }
-
-    function canRemove(uint256 userId, bytes32 uid, bytes memory /*data*/) external view returns (bool) {
+    function removeAccess(uint256 userId, bytes32 uid) external view returns (bool) {
         return userRoleForChannel[msg.sender][userId][uid] < Roles.ADMIN ? false : true;
     }
+
+    function getUpdateAccess(address origin, uint256 userId, bytes32 uid) external view returns (bool) {
+        return userRoleForChannel[origin][userId][uid] < Roles.ADMIN ? false : true;
+    }    
+    function getAddAccess(address origin, uint256 userId, bytes32 uid) external view returns (bool) {
+        return userRoleForChannel[origin][userId][uid] < Roles.MEMBER ? false : true;
+    }    
+    function getRemoveAccess(address origin, uint256 userId, bytes32 uid) external view returns (bool) {
+        return userRoleForChannel[origin][userId][uid] < Roles.ADMIN ? false : true;
+    }    
 }
