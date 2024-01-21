@@ -126,6 +126,7 @@ contract ChannelStore is IStore {
             // Emit for indexing
             emit Data(sender, userId, uid, pointer);
         } else if (command == uint8(Commands.LOGIC)) {
+            // Decode incoming data
             (address logic, bytes memory logicData) = abi.decode(data[1:], (address, bytes));
             // Set + initialize logic for channel
             _unsafeLogicInit(sender, userId, uid, logic, logicData);
