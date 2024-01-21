@@ -16,11 +16,6 @@ contract River is Auth {
     // TYPES
     //////////////////////////////////////////////////
 
-    enum Commands {
-        MESSAGE,
-        REPLACE
-    }
-
     struct Init {
         address store;
         bytes data;
@@ -28,7 +23,7 @@ contract River is Auth {
 
     struct Update {
         bytes32 uid;
-        Commands command;
+        address store;
         bytes data;
     }
 
@@ -39,15 +34,13 @@ contract River is Auth {
     // Uid is frozen or hasnt been created
     error Invalid_Uid();
     error No_Replace_Access();
-    error No_Message_Access();
 
     //////////////////////////////////////////////////
     // EVENTS
     //////////////////////////////////////////////////
 
     event NewUid(address sender, uint256 userId, bytes32 uid, address store);
-    event Replace(address sender, uint256 userId, bytes32 uid, address store);
-    event Message(address sender, uint256 userId, bytes32 uid);
+    event UpdateUid(address sender, uint256 userId, bytes32 uid, address store);
 
     //////////////////////////////////////////////////
     // STORAGE
@@ -103,22 +96,12 @@ contract River is Auth {
             if (creatorForUid[updates[i].uid] == 0) revert Invalid_Uid();
             // Lookup store address for uid
             IStore store = IStore(storeForUid[updates[i].uid]);            
-            // Check command
-            if (updates[i].command == Commands.MESSAGE) {
-                // Message store NOTE: access check will happen in store downstream of this
-                store.message(userId, updates[i].uid, updates[i].data);
-                // Emit for indexing
-                emit Message(sender, userId, updates[i].uid);
-            } else if (updates[i].command == Commands.REPLACE) {
-                // Check if user has access to replace store for uid
-                if (!store.getReplaceAccess(userId, updates[i].uid, updates[i].data)) revert No_Replace_Access();
-                // Extract store address from data
-                address newStore = address(bytes20(updates[i].data[0:20]));
-                // Set + init uid store
-                _unsafeStoreInit(userId, updates[i].uid, newStore, updates[i].data[20:]);                
-                // Emit for indexing
-                emit Replace(sender, userId, updates[i].uid, newStore);
-            }
+            // Check if user has access to replace store for uid
+            if (!store.getReplaceAccess(userId, address(this), updates[i].uid, updates[i].data)) revert No_Replace_Access();
+            // Set + init uid store
+            _unsafeStoreInit(userId, updates[i].uid, updates[i].store, updates[i].data);                
+            // Emit for indexing
+            emit UpdateUid(sender, userId, updates[i].uid, updates[i].store);
         }
     }
 

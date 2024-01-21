@@ -98,10 +98,6 @@ contract RoleBasedAccess is ILogic, Auth {
         return userRoleForChannel[msg.sender][userId][uid] < Roles.ADMIN ? false : true;
     }        
 
-    function canUpdate(uint256 userId, bytes32 uid, bytes memory /*data*/) external view returns (bool) {
-        return userRoleForChannel[msg.sender][userId][uid] < Roles.ADMIN ? false : true;
-    }        
-
     function canAdd(uint256 userId, bytes32 uid, bytes memory /*data*/) external view returns (bool) {
         return userRoleForChannel[msg.sender][userId][uid] < Roles.MEMBER ? false : true;
     }
