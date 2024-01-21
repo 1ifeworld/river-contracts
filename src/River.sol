@@ -54,6 +54,7 @@ contract River is Auth {
     IdRegistry public idRegistry;
     DelegateRegistry public delegateRegistry;
 
+    // TODO: determine if one global counter is an attack vector
     uint256 public uidCount;
     // TODO: determine if uids should rlly be hashes or if uint256 is better
     mapping(bytes32 uid => Info) public infoForUid;
