@@ -9,6 +9,7 @@ import {DelegateRegistry} from "../DelegateRegistry.sol";
  * @author Lifeworld
  */
 abstract contract Auth {
+    
     error Unauthorized_Signer_For_User(uint256 userId);
 
     function _authorizationCheck(

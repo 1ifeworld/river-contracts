@@ -56,6 +56,7 @@ contract DelegateRegistry is EIP712 {
     // WRITES
     //////////////////////////////////////////////////   
                 
+    // TODO: add sig based function
     function setDelegates(uint256 userId, Delegation[] memory dels) external {
         // Cache msg.sender
         address sender = msg.sender;

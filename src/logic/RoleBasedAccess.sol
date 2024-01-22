@@ -8,34 +8,35 @@ import {IRoles} from "../interfaces/IRoles.sol";
 
 /**
  * @title RoleBasedAccess
- * @author Lifeworld 
+ * @author Lifeworld
  */
 contract RoleBasedAccess is Auth, IRoles {
-
     //////////////////////////////////////////////////
     // ERRORS
-    //////////////////////////////////////////////////  
+    //////////////////////////////////////////////////
 
-    error Input_Length_Mismatch();  
-    error Only_Admin();  
+    error Input_Length_Mismatch();
+    error Only_Admin();
 
     //////////////////////////////////////////////////
     // EVENTS
-    //////////////////////////////////////////////////  
+    //////////////////////////////////////////////////
 
     event RolesSet(address sender, uint256 userId, uint256[] userIds, bytes32 channelHash, Roles[] roles);
-    
+
     //////////////////////////////////////////////////
     // STORAGE
-    //////////////////////////////////////////////////  
+    //////////////////////////////////////////////////
 
     IdRegistry public idRegistry;
-    DelegateRegistry public delegateRegistry;    
-    mapping(address target => mapping(uint256 userId => mapping(bytes32 channelHash => Roles))) public userRoleForChannel;
+    DelegateRegistry public delegateRegistry;
+    mapping(address target => 
+        mapping(uint256 userId => 
+            mapping(bytes32 channelHash => Roles))) public userRoleForChannel;
 
     //////////////////////////////////////////////////
     // CONSTRUCTOR
-    //////////////////////////////////////////////////      
+    //////////////////////////////////////////////////
 
     constructor(address _idRegistry, address _delegateRegistry) {
         idRegistry = IdRegistry(_idRegistry);
@@ -48,12 +49,9 @@ contract RoleBasedAccess is Auth, IRoles {
 
     function initializeWithData(uint256 userId, bytes32 channelHash, bytes memory data) external {
         // Cache msg.sender
-        address sender = msg.sender;     
+        address sender = msg.sender;
         // Decode incoming data
-        (
-            uint256[] memory userIds,
-            Roles[] memory roles
-        ) = abi.decode(data, (uint256[], Roles[]));
+        (uint256[] memory userIds, Roles[] memory roles) = abi.decode(data, (uint256[], Roles[]));
         // Check for valid inputs
         if (userIds.length != roles.length) revert Input_Length_Mismatch();
         // Set roles
@@ -63,13 +61,20 @@ contract RoleBasedAccess is Auth, IRoles {
         // Emit for indexing
         emit RolesSet(sender, userId, userIds, channelHash, roles);
     }
-    
-    // NOTE: have weird thing where you need to specify target since initializeWithData route 
+
+    // NOTE: have weird thing where you need to specify target since initializeWithData route
     //       means setting that as base variable for mapping
-    function editRoles(address target, uint256 userId, uint256[] memory userIds, bytes32 channelHash, Roles[] memory roles) external {        
+    function editRoles(
+        address target,
+        uint256 userId,
+        uint256[] memory userIds,
+        bytes32 channelHash,
+        Roles[] memory roles
+    ) external {
         // Check authorization status for msg.sender
-        address sender =
-            _authorizationCheck(idRegistry, delegateRegistry, userId, msg.sender, address(this), this.editRoles.selector);        
+        address sender = _authorizationCheck(
+            idRegistry, delegateRegistry, userId, msg.sender, address(this), this.editRoles.selector
+        );
         // Check for valid inputs
         if (userIds.length != roles.length) revert Input_Length_Mismatch();
         // Set roles
@@ -78,15 +83,24 @@ contract RoleBasedAccess is Auth, IRoles {
             userRoleForChannel[target][userIds[i]][channelHash] = roles[i];
         }
         // Emit for indexing
-        emit RolesSet(sender, userId, userIds, channelHash, roles);        
+        emit RolesSet(sender, userId, userIds, channelHash, roles);
     }
 
     //////////////////////////////////////////////////
     // READS
-    //////////////////////////////////////////////////    
+    //////////////////////////////////////////////////
 
     // NOTE: Uses role based access for all `access` returns
     function access(uint256 userId, bytes32 channelId, uint256 /*access*/) external view returns (uint256) {
         return uint256(userRoleForChannel[msg.sender][userId][channelId]);
+    }
+
+    // NOTE: Uses role based access for all `access` returns
+    function getAccess(address target, uint256 userId, bytes32 channelId, uint256 /*access*/)
+        external
+        view
+        returns (uint256)
+    {
+        return uint256(userRoleForChannel[target][userId][channelId]);
     }
 }
