@@ -10,6 +10,7 @@ import {ItemRegistry} from "../../src/ItemRegistry.sol";
 import {RoleBasedAccess} from "../../src/logic/RoleBasedAccess.sol";
 import {StringRenderer} from "../../src/renderer/StringRenderer.sol";
 import {NftRenderer} from "../../src/renderer/NftRenderer.sol";
+import {IRoles} from "../../src/interfaces/IRoles.sol";
 
 contract FullTestScript is Script {
 
@@ -35,8 +36,8 @@ contract FullTestScript is Script {
         uint256 userId = 1;
         uint256[] memory userIds = new uint256[](1);
         userIds[0] = userId;
-        RoleBasedAccess.Roles[] memory roles = new RoleBasedAccess.Roles[](1);
-        roles[0] = RoleBasedAccess.Roles.ADMIN;
+        IRoles.Roles[] memory roles = new RoleBasedAccess.Roles[](1);
+        roles[0] = IRoles.Roles.ADMIN;
         bytes memory logicInit = abi.encode(userIds, roles);
         // create new channel
         bytes32 channelHash = channelRegistry.newChannel(
@@ -46,14 +47,14 @@ contract FullTestScript is Script {
             logicInit
         );
         // prep data for new item
-        ItemRegistry.NewItem[] memory newItemInput = new ItemRegistry.NewItem[](1);
+        ItemRegistry.Init[] memory newItems = new ItemRegistry.Init[](1);
         // packs data so that [:20] == address of renderer, [20:] == bytes for renderer to decode into string
-        newItemInput[0].data = abi.encodePacked(address(stringRenderer), bytes("ipfs://bafybeiczsscdsbs7ffqz55asqdf3smv6klcw3gofszvwlyarci47bgf354"));
+        newItems[0].data = abi.encodePacked(address(stringRenderer), bytes("ipfs://bafybeiczsscdsbs7ffqz55asqdf3smv6klcw3gofszvwlyarci47bgf354"));
         bytes32[] memory channels = new bytes32[](1);
         channels[0] = channelHash;        
-        newItemInput[0].channels = channels;
+        newItems[0].channels = channels;
         // new item
-        itemRegistry.newItems(userId, newItemInput);        
+        itemRegistry.newItems(userId, newItems);        
         //                 
         vm.stopBroadcast();
     }

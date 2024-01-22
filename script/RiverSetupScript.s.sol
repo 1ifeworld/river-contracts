@@ -30,7 +30,7 @@ contract RiverSetupScript is Script {
         vm.startBroadcast(deployerPrivateKey);
         
         idRegistry = new IdRegistry();  
-        delegateRegistry = new DelegateRegistry();          
+        delegateRegistry = new DelegateRegistry(address(idRegistry));          
         channelRegistry = new ChannelRegistry(address(idRegistry), address(delegateRegistry));  
         itemRegistry = new ItemRegistry(address(idRegistry), address(delegateRegistry), address(channelRegistry));  
         roleBasedAccess = new RoleBasedAccess(address(idRegistry), address(delegateRegistry));  

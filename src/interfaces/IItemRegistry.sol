@@ -10,7 +10,7 @@ interface IItemRegistry {
     //////////////////////////////////////////////////
     // TYPES
     //////////////////////////////////////////////////     
-    struct NewItem {
+    struct Init {
         bytes data;
         bytes32[] channels;
     }      

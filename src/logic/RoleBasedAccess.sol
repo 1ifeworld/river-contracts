@@ -3,29 +3,20 @@ pragma solidity 0.8.23;
 
 import {IdRegistry} from "../IdRegistry.sol";
 import {DelegateRegistry} from "../DelegateRegistry.sol";
+import {Auth} from "../abstract/Auth.sol";
+import {IRoles} from "../interfaces/IRoles.sol";
 
 /**
  * @title RoleBasedAccess
  * @author Lifeworld 
  */
-contract RoleBasedAccess {
-
-    //////////////////////////////////////////////////
-    // TYPES
-    //////////////////////////////////////////////////      
-
-    enum Roles {
-        NONE,
-        MEMBER,
-        ADMIN
-    }    
+contract RoleBasedAccess is Auth, IRoles {
 
     //////////////////////////////////////////////////
     // ERRORS
     //////////////////////////////////////////////////  
 
     error Input_Length_Mismatch();  
-    error Unauthorized_Signer_For_User(uint256 userId);
     error Only_Admin();  
 
     //////////////////////////////////////////////////
@@ -75,13 +66,10 @@ contract RoleBasedAccess {
     
     // NOTE: have weird thing where you need to specify target since initializeWithData route 
     //       means setting that as base variable for mapping
-    function editRoles(address target, uint256 userId, uint256[] memory userIds, bytes32 channelHash, Roles[] memory roles) external {  
-        // Cache msg.sender
-        address sender = msg.sender;         
-        // Check that sender has write access for userId
-        if (sender != idRegistry.custodyOf(userId) 
-            && sender != delegateRegistry.delegateOf(userId)
-        ) revert Unauthorized_Signer_For_User(userId);          
+    function editRoles(address target, uint256 userId, uint256[] memory userIds, bytes32 channelHash, Roles[] memory roles) external {        
+        // Check authorization status for msg.sender
+        address sender =
+            _authorizationCheck(idRegistry, delegateRegistry, userId, msg.sender, address(this), this.editRoles.selector);        
         // Check for valid inputs
         if (userIds.length != roles.length) revert Input_Length_Mismatch();
         // Set roles
@@ -97,15 +85,8 @@ contract RoleBasedAccess {
     // READS
     //////////////////////////////////////////////////    
 
-    function canAdd(uint256 userId, bytes32 channelHash) external view returns (bool) {
-        return userRoleForChannel[msg.sender][userId][channelHash] < Roles.MEMBER ? false : true;
+    // NOTE: Uses role based access for all `access` returns
+    function access(uint256 userId, bytes32 channelId, uint256 /*access*/) external view returns (uint256) {
+        return uint256(userRoleForChannel[msg.sender][userId][channelId]);
     }
-
-    function canRemove(uint256 userId, bytes32 channelHash) external view returns (bool) {
-        return userRoleForChannel[msg.sender][userId][channelHash] < Roles.ADMIN ? false : true;
-    }
-
-    function canUpdateLogic(uint256 userId, bytes32 channelHash) external view returns (bool) {
-        return userRoleForChannel[msg.sender][userId][channelHash] < Roles.ADMIN ? false : true;
-    }    
 }

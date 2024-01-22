@@ -11,6 +11,7 @@ import {ItemRegistry} from "../src/ItemRegistry.sol";
 import {RoleBasedAccess} from "../src/logic/RoleBasedAccess.sol";
 import {StringRenderer} from "../src/renderer/StringRenderer.sol";
 import {NftRenderer} from "../src/renderer/NftRenderer.sol";
+import {IRoles} from "../../src/interfaces/IRoles.sol";
 
 /*
     TODO: Missing event testing
@@ -55,7 +56,7 @@ contract ItemRegistryTest is Test {
     // Set-up called before each test
     function setUp() public {
         idRegistry = new IdRegistry();  
-        delegateRegistry = new DelegateRegistry();          
+        delegateRegistry = new DelegateRegistry(address(idRegistry));          
         channelRegistry = new ChannelRegistry(address(idRegistry), address(delegateRegistry));  
         itemRegistry = new ItemRegistry(address(idRegistry), address(delegateRegistry), address(channelRegistry));  
         roleBasedAccess = new RoleBasedAccess(address(idRegistry), address(delegateRegistry));  
@@ -71,8 +72,8 @@ contract ItemRegistryTest is Test {
         bytes memory channelData = abi.encodePacked(address(stringRenderer), ipfsBytes);
         uint256[] memory userIds = new uint256[](1);
         userIds[0] = registeredUserId;
-        RoleBasedAccess.Roles[] memory roles = new RoleBasedAccess.Roles[](1);
-        roles[0] = RoleBasedAccess.Roles.ADMIN;
+        IRoles.Roles[] memory roles = new IRoles.Roles[](1);
+        roles[0] = IRoles.Roles.ADMIN;
         bytes memory logicInit = abi.encode(userIds, roles);
         // create new channel
         firstChannelHash = channelRegistry.newChannel(
@@ -93,24 +94,24 @@ contract ItemRegistryTest is Test {
         // prank into relay -- not the user
         vm.startPrank(relayer.addr);
         // prep data for new item
-        ItemRegistry.NewItem[] memory newItemInput = new ItemRegistry.NewItem[](1);
+        ItemRegistry.Init[] memory newItems = new ItemRegistry.Init[](1);
         // packs data so that [:20] == address of renderer, [20:] == bytes for renderer to decode into string
-        newItemInput[0].data = abi.encodePacked(address(stringRenderer), ipfsBytes);
+        newItems[0].data = abi.encodePacked(address(stringRenderer), ipfsBytes);
         bytes32[] memory channels = new bytes32[](1);
         channels[0] = firstChannelHash;        
-        newItemInput[0].channels = channels;
+        newItems[0].channels = channels;
         // generate signature for newItemsFor call
         bytes memory signature = _signNewItemFor(
             user.key,
             registeredUserId,
-            newItemInput,
+            newItems,
             _deadline()
         );
         // create item
         (bytes32[] memory itemHashes, address[] memory pointers) = itemRegistry.newItemsFor(
             user.addr,
             registeredUserId,
-            newItemInput,
+            newItems,
             _deadline(),
             signature
         );
@@ -228,24 +229,24 @@ contract ItemRegistryTest is Test {
         // prank into relay -- not the user
         vm.startPrank(relayer.addr);
         // prep data for new item
-        ItemRegistry.NewItem[] memory newItemInput = new ItemRegistry.NewItem[](1);
+        ItemRegistry.Init[] memory newItems = new ItemRegistry.Init[](1);
         // packs data so that [:20] == address of renderer, [20:] == bytes for renderer to decode into string
-        newItemInput[0].data = abi.encodePacked(address(stringRenderer), ipfsBytes);
+        newItems[0].data = abi.encodePacked(address(stringRenderer), ipfsBytes);
         bytes32[] memory channels = new bytes32[](1);
         channels[0] = firstChannelHash;        
-        newItemInput[0].channels = channels;
+        newItems[0].channels = channels;
         // generate signature for newItemsFor call
         bytes memory signature = _signNewItemFor(
             user.key,
             registeredUserId,
-            newItemInput,
+            newItems,
             _deadline()
         );
         // create item
         (bytes32[] memory itemHashes,) = itemRegistry.newItemsFor(
             user.addr,
             registeredUserId,
-            newItemInput,
+            newItems,
             _deadline(),
             signature
         );
@@ -278,24 +279,24 @@ contract ItemRegistryTest is Test {
         // prank into relay -- not the user
         vm.startPrank(relayer.addr);
         // prep data for new item
-        ItemRegistry.NewItem[] memory newItemInput = new ItemRegistry.NewItem[](1);
+        ItemRegistry.Init[] memory newItems = new ItemRegistry.Init[](1);
         // packs data so that [:20] == address of renderer, [20:] == bytes for renderer to decode into string
-        newItemInput[0].data = abi.encodePacked(address(stringRenderer), ipfsBytes);
+        newItems[0].data = abi.encodePacked(address(stringRenderer), ipfsBytes);
         bytes32[] memory channels = new bytes32[](1);
         channels[0] = firstChannelHash;        
-        newItemInput[0].channels = channels;
+        newItems[0].channels = channels;
         // generate signature for newItemsFor call
         bytes memory signature = _signNewItemFor(
             user.key,
             registeredUserId,
-            newItemInput,
+            newItems,
             _deadline()
         );
         // create item
         (bytes32[] memory itemHashes,) = itemRegistry.newItemsFor(
             user.addr,
             registeredUserId,
-            newItemInput,
+            newItems,
             _deadline(),
             signature
         );
@@ -345,7 +346,7 @@ contract ItemRegistryTest is Test {
     function _signNewItemFor(
         uint256 pk,
         uint256 userId,
-        ItemRegistry.NewItem[] memory newItems,
+        ItemRegistry.Init[] memory newItems,
         uint256 deadline
     ) internal returns (bytes memory signature) {
         bytes32 digest = itemRegistry.hashTypedDataV4(

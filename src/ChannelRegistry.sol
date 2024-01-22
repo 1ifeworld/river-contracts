@@ -44,17 +44,18 @@ contract ChannelRegistry is ChannelRegistrySignatures, Auth, Hash, Salt {
     // TODO: is this a valid typehash? theres other bytes inputs that are passed in
     //       but unclear if thats worth including? since wont be readable anyway in signing flow?
     bytes32 public constant UPDATE_CHANNEL_DATA_TYPEHASH =
-        keccak256("UpdateChannelData(uint256 userId,bytes32 channelHash,uint256 deadline)");      
+        keccak256("UpdateChannelData(uint256 userId,bytes32 channelHash,uint256 deadline)");
 
     // TODO: is this a valid typehash? theres other bytes inputs that are passed in
     //       but unclear if thats worth including? since wont be readable anyway in signing flow?
     bytes32 public constant UPDATE_CHANNEL_LOGIC_TYPEHASH =
-        keccak256("UpdateChannelLogic(uint256 userId,bytes32 channelHash,address logic,uint256 deadline)");                 
+        keccak256("UpdateChannelLogic(uint256 userId,bytes32 channelHash,address logic,uint256 deadline)");
 
     //////////////////////////////////////////////////
     // STORAGE
     //////////////////////////////////////////////////
 
+    address public immutable self;
     IdRegistry public idRegistry;
     DelegateRegistry public delegateRegistry;
     mapping(uint256 userId => uint256 channelId) public channelCountForUser;
@@ -67,6 +68,7 @@ contract ChannelRegistry is ChannelRegistrySignatures, Auth, Hash, Salt {
     //////////////////////////////////////////////////
 
     constructor(address _idRegistry, address _delegateRegistry) EIP712("ChannelRegistry", "1") {
+        self = address(this);
         idRegistry = IdRegistry(_idRegistry);
         delegateRegistry = DelegateRegistry(_delegateRegistry);
     }
@@ -81,81 +83,84 @@ contract ChannelRegistry is ChannelRegistrySignatures, Auth, Hash, Salt {
         returns (bytes32 channelHash)
     {
         // Check authorization status for msg.sender
-        address sender = _authorizationCheck(idRegistry, delegateRegistry, msg.sender, userId);
+        address sender =
+            _authorizationCheck(idRegistry, delegateRegistry, userId, msg.sender, self, this.newChannel.selector);
         // Create new channel
         channelHash = _unsafeNewChannel(sender, userId, data, logic, logicInit);
     }
 
     function updateChannelData(uint256 userId, bytes32 channelHash, bytes calldata data) public {
         // Check authorization status for msg.sender
-        address sender = _authorizationCheck(idRegistry, delegateRegistry, msg.sender, userId);
+        address sender =
+            _authorizationCheck(idRegistry, delegateRegistry, userId, msg.sender, self, this.updateChannelData.selector);
         // Update channel data
         _unsafeUpdateChannelData(sender, userId, channelHash, data);
-    } 
+    }
 
     function updateChannelLogic(uint256 userId, bytes32 channelHash, address logic, bytes calldata logicInit) public {
         // Check authorization status for msg.sender
-        address sender = _authorizationCheck(idRegistry, delegateRegistry, msg.sender, userId);
+        address sender =
+            _authorizationCheck(idRegistry, delegateRegistry, userId, msg.sender, self, this.updateChannelLogic.selector);
         // Update channel logic
         _unsafeUpdateChannelLogic(sender, userId, channelHash, logic, logicInit);
     }
 
     //////////////////////////////////////////////////
     // SIGNATURE BASED WRITES
-    //////////////////////////////////////////////////  
+    //////////////////////////////////////////////////
 
     function newChannelFor(
         address signer,
-        uint256 userId, 
-        bytes calldata data, 
-        address logic, 
+        uint256 userId,
+        bytes calldata data,
+        address logic,
         bytes calldata logicInit,
         uint256 deadline,
         bytes calldata sig
-    )
-        public 
-        returns (bytes32 channelHash)
-    {
+    ) public returns (bytes32 channelHash) {
         // Verify valid transaction being generated on behalf of signer
-        _verifyNewChannelSig(userId, logic, signer, NEW_CHANNEL_TYPEHASH, deadline, sig);        
-        // Check authorization status for msg.sender
-        address sender = _authorizationCheck(idRegistry, delegateRegistry, msg.sender, userId);
+        _verifyNewChannelSig(userId, logic, signer, NEW_CHANNEL_TYPEHASH, deadline, sig);
+        // Check authorization status for authorizedSigner
+        address authorizedSigner =
+            _authorizationCheck(idRegistry, delegateRegistry, userId, signer, self, this.newChannel.selector);
         // Create new channel
-        channelHash = _unsafeNewChannel(sender, userId, data, logic, logicInit);
-    }      
+        channelHash = _unsafeNewChannel(authorizedSigner, userId, data, logic, logicInit);
+    }
 
     function updateChannelDataFor(
         address signer,
-        uint256 userId, 
-        bytes32 channelHash, 
-        bytes calldata data, 
+        uint256 userId,
+        bytes32 channelHash,
+        bytes calldata data,
         uint256 deadline,
         bytes calldata sig
     ) public returns (address pointer) {
         // Verify valid transaction being generated on behalf of signer
         _verifyUpdateChannelDataSig(userId, channelHash, signer, UPDATE_CHANNEL_DATA_TYPEHASH, deadline, sig);
-        // Check authorization status for msg.sender
-        address sender = _authorizationCheck(idRegistry, delegateRegistry, msg.sender, userId);
+        // Check authorization status for authorizedSigner
+        address authorizedSigner =
+            _authorizationCheck(idRegistry, delegateRegistry, userId, signer, self, this.updateChannelData.selector);
         // Update channel data
-        pointer = _unsafeUpdateChannelData(sender, userId, channelHash, data);        
+        pointer = _unsafeUpdateChannelData(authorizedSigner, userId, channelHash, data);
     }
 
     function updateChannelLogicFor(
         address signer,
-        uint256 userId, 
-        bytes32 channelHash, 
+        uint256 userId,
+        bytes32 channelHash,
         address logic,
-        bytes calldata logicInit, 
+        bytes calldata logicInit,
         uint256 deadline,
         bytes calldata sig
-    ) public  {
+    ) public {
         // Verify valid transaction being generated on behalf of signer
         _verifyUpdateChannelLogicSig(userId, channelHash, logic, signer, UPDATE_CHANNEL_LOGIC_TYPEHASH, deadline, sig);
-        // Check authorization status for msg.sender
-        address sender = _authorizationCheck(idRegistry, delegateRegistry, msg.sender, userId);
+        // Check authorization status for signer
+        address authorizedSigner =
+            _authorizationCheck(idRegistry, delegateRegistry, userId, signer, self, this.updateChannelLogic.selector);
         // Update channel logic
-        _unsafeUpdateChannelLogic(sender, userId, channelHash, logic, logicInit);       
-    }    
+        _unsafeUpdateChannelLogic(authorizedSigner, userId, channelHash, logic, logicInit);
+    }
 
     //////////////////////////////////////////////////
     // READS
@@ -168,16 +173,9 @@ contract ChannelRegistry is ChannelRegistrySignatures, Auth, Hash, Salt {
         uri = IRenderer(renderer).render(data);
     }
 
-    function getAddAccess(uint256 userId, bytes32 channelHash) public view returns (bool) {
-        return ILogic(logicForChannel[channelHash]).canAdd(userId, channelHash);
-    }
-
-    function getRemoveAccess(uint256 userId, bytes32 channelHash) public view returns (bool) {
-        return ILogic(logicForChannel[channelHash]).canRemove(userId, channelHash);
-    }
-
-    function getUpdateAccess(uint256 userId, bytes32 channelHash) public view returns (bool) {
-        return ILogic(logicForChannel[channelHash]).canUpdate(userId, channelHash);
+    // TODO: add data to this for sig based access?
+    function getAccess(uint256 userId, bytes32 channelId, uint256 access) public view returns (uint256 role) {
+        return ILogic(logicForChannel[channelId]).access(userId, channelId, access);
     }
 
     function generateChannelHash(uint256 userId, uint256 channelId) external pure returns (bytes32 channelhash) {
@@ -187,13 +185,13 @@ contract ChannelRegistry is ChannelRegistrySignatures, Auth, Hash, Salt {
     //////////////////////////////////////////////////
     // INTERNAL
     //////////////////////////////////////////////////
-    
+
     /*
     *   NOTE:
     *   Unsafe means any no userId checks occur in this function
     *   Access control checks ARE applied in this function
     */
-    
+
     function _unsafeNewChannel(
         address sender,
         uint256 userId,
@@ -238,5 +236,5 @@ contract ChannelRegistry is ChannelRegistrySignatures, Auth, Hash, Salt {
         ILogic(logic).initializeWithData(userId, channelHash, logicInit);
         // Emit for indexing
         emit UpdateLogic(sender, userId, channelHash, logic);
-    } 
+    }
 }

@@ -5,7 +5,6 @@ import {IItemRegistry} from "../../interfaces/IItemRegistry.sol";
 import {Signatures} from "./Signatures.sol";
 import {EIP712} from "../EIP712.sol";
 
-
 abstract contract ItemRegistrySignatures is Signatures, EIP712 {
     
     //////////////////////////////////////////////////
@@ -20,14 +19,14 @@ abstract contract ItemRegistrySignatures is Signatures, EIP712 {
     
     function _verifyNewItemsSig(         
         uint256 userId, 
-        IItemRegistry.NewItem[] memory newItemInputs, 
+        IItemRegistry.Init[] memory inits, 
         address signer,
         bytes32 typehash,
         uint256 deadline, 
         bytes memory sig
     ) internal view {
         _verifySig(
-            _hashTypedDataV4(keccak256(abi.encode(typehash, userId, newItemInputs, deadline))),
+            _hashTypedDataV4(keccak256(abi.encode(typehash, userId, inits, deadline))),
             signer,
             deadline,
             sig
@@ -52,7 +51,6 @@ abstract contract ItemRegistrySignatures is Signatures, EIP712 {
     }  
 
     function _verifyAddBatchSig(
-        
         uint256 userId, 
         bytes32 itemHash,
         bytes32[] calldata channelHashes,
@@ -69,8 +67,7 @@ abstract contract ItemRegistrySignatures is Signatures, EIP712 {
         );
     }             
 
-    function _verifyRemoveSig(
-        
+    function _verifyRemoveSig(        
         uint256 userId, 
         bytes32 itemHash,
         bytes32 channelHash,
@@ -87,8 +84,7 @@ abstract contract ItemRegistrySignatures is Signatures, EIP712 {
         );
     }      
 
-    function _verifyEditSig(
-        
+    function _verifyEditSig(        
         uint256 userId, 
         bytes32 itemHash,
         bytes calldata data,

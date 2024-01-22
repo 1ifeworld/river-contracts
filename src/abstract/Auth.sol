@@ -14,12 +14,16 @@ abstract contract Auth {
     function _authorizationCheck(
         IdRegistry idRegistry,
         DelegateRegistry delegateRegistry,
+        uint256 userId,
         address account,
-        uint256 userId
+        address target,
+        bytes4 selector
     ) internal view returns (address) {
-        // Check that sender has write access for userId
-        if (account != idRegistry.custodyOf(userId) && account != delegateRegistry.delegateOf(userId)) {
-            revert Unauthorized_Signer_For_User(userId);
+        // Check that account is custody address or is delegate of userId
+        if (account != idRegistry.custodyOf(userId)) {
+            if (!delegateRegistry.isDelegate(userId, account, target, selector)) {
+                revert Unauthorized_Signer_For_User(userId);
+            }
         }
         // Return account address as authorized sender
         return account;
