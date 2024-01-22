@@ -30,9 +30,7 @@ contract RoleBasedAccess is Auth, IRoles {
 
     IdRegistry public idRegistry;
     DelegateRegistry public delegateRegistry;
-    mapping(address target => 
-        mapping(uint256 userId => 
-            mapping(bytes32 channelHash => Roles))) public userRoleForChannel;
+    mapping(address target => mapping(uint256 userId => mapping(bytes32 channelHash => Roles))) public userRoleForChannel;
 
     //////////////////////////////////////////////////
     // CONSTRUCTOR

@@ -175,7 +175,7 @@ contract ChannelRegistry is ChannelRegistrySignatures, Auth, Hash, Salt {
 
     // TODO: add data to this for sig based access?
     function getAccess(uint256 userId, bytes32 channelId, uint256 access) public view returns (uint256 role) {
-        return ILogic(logicForChannel[channelId]).access(userId, channelId, access);
+        return _getAccess(userId, channelId, access);
     }
 
     function generateChannelHash(uint256 userId, uint256 channelId) external pure returns (bytes32 channelhash) {
@@ -185,6 +185,11 @@ contract ChannelRegistry is ChannelRegistrySignatures, Auth, Hash, Salt {
     //////////////////////////////////////////////////
     // INTERNAL
     //////////////////////////////////////////////////
+
+    function _getAccess(uint256 userId, bytes32 channelId, uint256 access) internal view returns (uint256 role) {
+        return ILogic(logicForChannel[channelId]).access(userId, channelId, access);
+    }        
+
 
     /*
     *   NOTE:
@@ -214,8 +219,10 @@ contract ChannelRegistry is ChannelRegistrySignatures, Auth, Hash, Salt {
         internal
         returns (address pointer)
     {
-        // Check if user can update channel data
-        if (!ILogic(logicForChannel[channelHash]).canUpdate(userId, channelHash)) revert No_Update_Access();
+        // TODO: FIX
+        // // Check if user can update channel data
+        // if (!ILogic(logicForChannel[channelHash]).canUpdate(userId, channelHash)) revert No_Update_Access();
+
         // Update channel data
         pointer = dataForChannel[channelHash] = SSTORE2.write(data);
         // Emit for indexing
@@ -229,8 +236,10 @@ contract ChannelRegistry is ChannelRegistrySignatures, Auth, Hash, Salt {
         address logic,
         bytes calldata logicInit
     ) internal {
-        // Check if user can update channel logic
-        if (!ILogic(logicForChannel[channelHash]).canUpdate(userId, channelHash)) revert No_Update_Access();
+        // TODO: FIX
+        // // Check if user can update channel logic
+        // if (!ILogic(logicForChannel[channelHash]).canUpdate(userId, channelHash)) revert No_Update_Access();
+
         // Update channel logic
         logicForChannel[channelHash] = logic;
         ILogic(logic).initializeWithData(userId, channelHash, logicInit);
