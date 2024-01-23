@@ -21,7 +21,7 @@ import {Hash} from "./abstract/Hash.sol";
 contract ChannelRegistry is ChannelRegistrySignatures, Auth, Hash, Salt, IRoles {
 
     //////////////////////////////////////////////////
-    // ACTIONS
+    // TYPES
     //////////////////////////////////////////////////    
     
     enum Actions {
