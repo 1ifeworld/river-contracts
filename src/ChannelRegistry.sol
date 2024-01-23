@@ -7,6 +7,7 @@ import {IdRegistry} from "./IdRegistry.sol";
 import {DelegateRegistry} from "./DelegateRegistry.sol";
 import {IRenderer} from "./interfaces/IRenderer.sol";
 import {ILogic} from "./interfaces/ILogic.sol";
+import {IRoles} from "./interfaces/IRoles.sol";
 import {ChannelRegistrySignatures} from "./abstract/signatures/ChannelRegistrySignatures.sol";
 import {EIP712} from "./abstract/EIP712.sol";
 import {Auth} from "./abstract/Auth.sol";
@@ -17,7 +18,16 @@ import {Hash} from "./abstract/Hash.sol";
  * @title ChannelRegistry
  * @author Lifeworld
  */
-contract ChannelRegistry is ChannelRegistrySignatures, Auth, Hash, Salt {
+contract ChannelRegistry is ChannelRegistrySignatures, Auth, Hash, Salt, IRoles {
+
+    //////////////////////////////////////////////////
+    // ACTIONS
+    //////////////////////////////////////////////////    
+    
+    enum Actions {
+        UPDATE
+    }
+
     //////////////////////////////////////////////////
     // ERRORS
     //////////////////////////////////////////////////
@@ -99,8 +109,9 @@ contract ChannelRegistry is ChannelRegistrySignatures, Auth, Hash, Salt {
 
     function updateChannelLogic(uint256 userId, bytes32 channelHash, address logic, bytes calldata logicInit) public {
         // Check authorization status for msg.sender
-        address sender =
-            _authorizationCheck(idRegistry, delegateRegistry, userId, msg.sender, self, this.updateChannelLogic.selector);
+        address sender = _authorizationCheck(
+            idRegistry, delegateRegistry, userId, msg.sender, self, this.updateChannelLogic.selector
+        );
         // Update channel logic
         _unsafeUpdateChannelLogic(sender, userId, channelHash, logic, logicInit);
     }
@@ -188,8 +199,7 @@ contract ChannelRegistry is ChannelRegistrySignatures, Auth, Hash, Salt {
 
     function _getAccess(uint256 userId, bytes32 channelId, uint256 access) internal view returns (uint256 role) {
         return ILogic(logicForChannel[channelId]).access(userId, channelId, access);
-    }        
-
+    }
 
     /*
     *   NOTE:
@@ -219,10 +229,10 @@ contract ChannelRegistry is ChannelRegistrySignatures, Auth, Hash, Salt {
         internal
         returns (address pointer)
     {
-        // TODO: FIX
-        // // Check if user can update channel data
-        // if (!ILogic(logicForChannel[channelHash]).canUpdate(userId, channelHash)) revert No_Update_Access();
-
+        // Check if user can update channel data
+        if (ILogic(logicForChannel[channelHash]).access(userId, channelHash, uint256(Actions.UPDATE)) < uint256(Roles.ADMIN)) {
+            revert No_Update_Access();
+        }
         // Update channel data
         pointer = dataForChannel[channelHash] = SSTORE2.write(data);
         // Emit for indexing
@@ -236,10 +246,10 @@ contract ChannelRegistry is ChannelRegistrySignatures, Auth, Hash, Salt {
         address logic,
         bytes calldata logicInit
     ) internal {
-        // TODO: FIX
-        // // Check if user can update channel logic
-        // if (!ILogic(logicForChannel[channelHash]).canUpdate(userId, channelHash)) revert No_Update_Access();
-
+        // Check if user can update channel logic
+        if (ILogic(logicForChannel[channelHash]).access(userId, channelHash, uint256(Actions.UPDATE)) < uint256(Roles.ADMIN)) {        
+            revert No_Update_Access();
+        }
         // Update channel logic
         logicForChannel[channelHash] = logic;
         ILogic(logic).initializeWithData(userId, channelHash, logicInit);
