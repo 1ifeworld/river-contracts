@@ -7,7 +7,7 @@ import {EIP712} from "../EIP712.sol";
 abstract contract ChannelRegistrySignatures is Signatures, EIP712 {
     
     //////////////////////////////////////////////////
-    // ITEM REGISTRY HELPERS
+    // CHANNEL REGISTRY HELPERS
     ////////////////////////////////////////////////// 
 
     /*

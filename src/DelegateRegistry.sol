@@ -2,24 +2,14 @@
 pragma solidity 0.8.23;
 
 import {IdRegistry} from "./IdRegistry.sol";
+import {DelegateRegistrySignatures} from "./abstract/signatures/DelegateRegistrySignatures.sol";
 import {EIP712} from "./abstract/EIP712.sol";
 
 /**
  * @title DelegateRegistry
  * @author Lifeworld
  */
-contract DelegateRegistry is EIP712 {
-
-    //////////////////////////////////////////////////
-    // TYPES
-    //////////////////////////////////////////////////    
-
-    struct Delegation {
-        address target;
-        bytes4 selector;
-        bool status;
-        address delegate;
-    }
+contract DelegateRegistry is DelegateRegistrySignatures {
 
     //////////////////////////////////////////////////
     // ERRORS
@@ -32,6 +22,15 @@ contract DelegateRegistry is EIP712 {
     //////////////////////////////////////////////////        
     
     event Delegations(address sender, uint256 userId, Delegation[]);
+
+    //////////////////////////////////////////////////
+    // CONSTANTS
+    //////////////////////////////////////////////////      
+
+    // TODO: is this a valid typehash? theres other bytes inputs that are passed in
+    //       but unclear if thats worth including? since wont be readable anyway in signing flow?
+    bytes32 public constant SET_DELEGATES_TYPEHASH =
+        keccak256("SetDelegates(uint256 userId,Delegation[] dels)");    
 
     //////////////////////////////////////////////////
     // STORAGE
@@ -60,7 +59,7 @@ contract DelegateRegistry is EIP712 {
     function setDelegates(uint256 userId, Delegation[] memory dels) external {
         // Cache msg.sender
         address sender = msg.sender;
-        // Check authorization status for msg.sender 
+        // Check authorization status for msg.sender. Must be custody address
         if (sender != idRegistry.custodyOf(userId)) revert Unauthorized_Signer_For_User(userId);
         // Process delegations
         for (uint256 i; i < dels.length; ++i) {
@@ -69,4 +68,18 @@ contract DelegateRegistry is EIP712 {
         // Emit for indexing
         emit Delegations(sender, userId, dels);
     }
+
+    // TODO: add sig based function
+    function setDelegatesFor(uint256 userId, Delegation[] memory dels, address signer, uint256 deadline, bytes calldata sig) external {
+        // verify signer check
+        _verifySetDelegatesSig(userId, dels, signer, SET_DELEGATES_TYPEHASH, deadline, sig);        
+        // Check authorization status for msg.sender. Must be custody address
+        if (signer != idRegistry.custodyOf(userId)) revert Unauthorized_Signer_For_User(userId);
+        // Process delegations
+        for (uint256 i; i < dels.length; ++i) {
+            isDelegate[userId][dels[i].delegate][dels[i].target][dels[i].selector] = dels[i].status;    
+        }
+        // Emit for indexing
+        emit Delegations(signer, userId, dels);
+    }    
 }   

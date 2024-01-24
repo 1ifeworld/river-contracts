@@ -7,6 +7,7 @@ import {IdRegistry} from "../src/IdRegistry.sol";
 import {DelegateRegistry} from "../src/DelegateRegistry.sol";
 import {ChannelRegistry} from "../src/ChannelRegistry.sol";
 import {ItemRegistry} from "../src/ItemRegistry.sol";
+import {IDelegateRegistry} from "../src/interfaces/IDelegateRegistry.sol";
 
 import {RoleBasedAccess} from "../src/logic/RoleBasedAccess.sol";
 import {StringRenderer} from "../src/renderer/StringRenderer.sol";
@@ -81,24 +82,26 @@ contract DelegateRegistryTest is Test {
     function test_delegate() public {
         vm.startPrank(user.addr);
         // Prep data for delegation
-        DelegateRegistry.Delegation[] memory dels = new DelegateRegistry.Delegation[](1);
-        dels[0] = DelegateRegistry.Delegation({
+        IDelegateRegistry.Delegation[] memory dels = new IDelegateRegistry.Delegation[](1);
+        dels[0] = IDelegateRegistry.Delegation({
             target: address(channelRegistry),
             selector: ChannelRegistry.newChannel.selector,
             status: true,
             delegate: delegate.addr 
         });
+        // test delegate before
+        assertEq(delegateRegistry.isDelegate(1, delegate.addr, address(channelRegistry), ChannelRegistry.newChannel.selector), false);        
         // process delegates
         delegateRegistry.setDelegates(1, dels);
-        // test delegate
+        // test delegate after
         assertEq(delegateRegistry.isDelegate(1, delegate.addr, address(channelRegistry), ChannelRegistry.newChannel.selector), true);
     }
 
     function test_newChannel_delegate() public {
         vm.startPrank(user.addr);
         // Prep data for delegation
-        DelegateRegistry.Delegation[] memory dels = new DelegateRegistry.Delegation[](1);
-        dels[0] = DelegateRegistry.Delegation({
+        IDelegateRegistry.Delegation[] memory dels = new IDelegateRegistry.Delegation[](1);
+        dels[0] = IDelegateRegistry.Delegation({
             target: address(channelRegistry),
             selector: ChannelRegistry.newChannel.selector,
             status: true,
@@ -129,8 +132,8 @@ contract DelegateRegistryTest is Test {
     function test_Revert_newChannel_delegate() public {
         vm.startPrank(user.addr);
         // Prep data for delegation
-        DelegateRegistry.Delegation[] memory dels = new DelegateRegistry.Delegation[](1);
-        dels[0] = DelegateRegistry.Delegation({
+        IDelegateRegistry.Delegation[] memory dels = new IDelegateRegistry.Delegation[](1);
+        dels[0] = IDelegateRegistry.Delegation({
             target: address(channelRegistry),
             selector: ChannelRegistry.updateChannelLogic.selector,
             status: true,
@@ -163,22 +166,29 @@ contract DelegateRegistryTest is Test {
     // SIGNATURE BASED WRITES
     //////////////////////////////////////////////////    
 
-    // // prep create channel for user
-    // bytes memory channelData = abi.encodePacked(address(stringRenderer), ipfsBytes);
-    // uint256[] memory userIds = new uint256[](1);
-    // userIds[0] = registeredUserId;
-    // IRoles.Roles[] memory roles = new IRoles.Roles[](1);
-    // roles[0] = IRoles.Roles.ADMIN;
-    // bytes memory logicInit = abi.encode(userIds, roles);
-    // // create new channel
-    // firstChannelHash = channelRegistry.newChannel(
-    //     registeredUserId,
-    //     channelData,
-    //     address(roleBasedAccess),
-    //     logicInit
-    // );            
-
-
+    function test_sigBased_delegate() public {
+        vm.startPrank(relayer.addr);
+        // Prep data for delegation
+        IDelegateRegistry.Delegation[] memory dels = new IDelegateRegistry.Delegation[](1);
+        dels[0] = IDelegateRegistry.Delegation({
+            target: address(channelRegistry),
+            selector: ChannelRegistry.newChannel.selector,
+            status: true,
+            delegate: delegate.addr 
+        });
+        // Generate signature for setDelegatesFor call
+        bytes memory signature = _signSetDelegatesFor(
+            user.key,
+            registeredUserId,
+            dels,
+            _deadline()
+        );        
+        // process delegate
+        delegateRegistry.setDelegatesFor(1, dels, user.addr, _deadline(), signature);
+        // test delegate
+        assertEq(delegateRegistry.isDelegate(1, delegate.addr, address(channelRegistry), ChannelRegistry.newChannel.selector), true);        
+    }    
+        
     //////////////////////////////////////////////////
     // HELPERS
     //////////////////////////////////////////////////  
@@ -193,81 +203,15 @@ contract DelegateRegistryTest is Test {
         assertEq(sig.length, 65);
     }                       
 
-    function _signNewItemFor(
+    function _signSetDelegatesFor(
         uint256 pk,
         uint256 userId,
-        ItemRegistry.Init[] memory newItems,
+        IDelegateRegistry.Delegation[] memory dels,
         uint256 deadline
     ) internal returns (bytes memory signature) {
-        bytes32 digest = itemRegistry.hashTypedDataV4(
-            keccak256(abi.encode(itemRegistry.NEW_ITEMS_TYPEHASH(), userId, newItems, deadline))
-        );
-        signature = _sign(pk, digest);
-    }          
-
-    function _signAddFor(
-        uint256 pk,
-        uint256 userId,
-        bytes32 itemHash,
-        bytes32 channelHash,
-        uint256 deadline
-    ) internal returns (bytes memory signature) {
-        bytes32 digest = itemRegistry.hashTypedDataV4(
-            keccak256(abi.encode(itemRegistry.ADD_TYPEHASH(), userId, itemHash, channelHash, deadline))
+        bytes32 digest = delegateRegistry.hashTypedDataV4(
+            keccak256(abi.encode(delegateRegistry.SET_DELEGATES_TYPEHASH(), userId, dels, deadline))
         );
         signature = _sign(pk, digest);
     }      
-
-    function _signAddBatchFor(
-        uint256 pk,
-        uint256 userId,
-        bytes32 itemHash,
-        bytes32[] memory channelHashes,
-        uint256 deadline
-    ) internal returns (bytes memory signature) {
-        bytes32 digest = itemRegistry.hashTypedDataV4(
-            keccak256(abi.encode(itemRegistry.ADD_BATCH_TYPEHASH(), userId, itemHash, channelHashes, deadline))
-        );
-        signature = _sign(pk, digest);
-    }          
-
-    function _signRemoveFor(
-        uint256 pk,
-        uint256 userId,
-        bytes32 itemHash,
-        bytes32 channelHash,
-        uint256 deadline
-    ) internal returns (bytes memory signature) {
-        bytes32 digest = itemRegistry.hashTypedDataV4(
-            keccak256(abi.encode(itemRegistry.REMOVE_TYPEHASH(), userId, itemHash, channelHash, deadline))
-        );
-        signature = _sign(pk, digest);
-    }           
-
-    function _signEditFor(
-        uint256 pk,
-        uint256 userId,
-        bytes32 itemHash,
-        bytes memory data,
-        uint256 deadline
-    ) internal returns (bytes memory signature) {
-        bytes32 digest = itemRegistry.hashTypedDataV4(
-            keccak256(abi.encode(itemRegistry.EDIT_TYPEHASH(), userId, itemHash, data, deadline))
-        );
-        signature = _sign(pk, digest);
-    }          
-
-    function _signUpdateAdminsFor(
-        uint256 pk,
-        uint256 userId,
-        bytes32 itemHash,
-        uint256[] memory userIds,
-        bool[] memory statuses,
-        uint256 deadline
-    ) internal returns (bytes memory signature) {
-        bytes32 digest = itemRegistry.hashTypedDataV4(
-            keccak256(abi.encode(itemRegistry.UPDATE_ADMINS_TYPEHASH(), userId, itemHash, userIds, statuses, deadline))
-        );
-        signature = _sign(pk, digest);
-    }       
 }
