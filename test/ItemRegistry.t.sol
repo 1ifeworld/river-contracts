@@ -76,7 +76,7 @@ contract ItemRegistryTest is Test {
         roles[0] = IRoles.Roles.ADMIN;
         bytes memory logicInit = abi.encode(userIds, roles);
         // create new channel
-        firstChannelHash = channelRegistry.newChannel(
+        (firstChannelHash,) = channelRegistry.newChannel(
             registeredUserId,
             channelData,
             address(roleBasedAccess),

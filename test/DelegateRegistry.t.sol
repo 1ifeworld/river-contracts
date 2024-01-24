@@ -119,7 +119,7 @@ contract DelegateRegistryTest is Test {
         roles[0] = IRoles.Roles.ADMIN;
         bytes memory logicInit = abi.encode(userIds, roles);
         // create new channel
-        firstChannelHash = channelRegistry.newChannel(
+        (firstChannelHash,) = channelRegistry.newChannel(
             1,
             channelData,
             address(roleBasedAccess),
@@ -153,7 +153,7 @@ contract DelegateRegistryTest is Test {
         // create new channel
         // NOTE: expeect revert delagated selector not "newChannel"
         vm.expectRevert();
-        firstChannelHash = channelRegistry.newChannel(
+        (firstChannelHash,) = channelRegistry.newChannel(
             1,
             channelData,
             address(roleBasedAccess),

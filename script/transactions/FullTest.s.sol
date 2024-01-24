@@ -40,7 +40,7 @@ contract FullTestScript is Script {
         roles[0] = IRoles.Roles.ADMIN;
         bytes memory logicInit = abi.encode(userIds, roles);
         // create new channel
-        bytes32 channelHash = channelRegistry.newChannel(
+        (bytes32 channelHash,) = channelRegistry.newChannel(
             userId,
             "ipfs://bafybeiczsscdsbs7ffqz55asqdf3smv6klcw3gofszvwlyarci47bgf354",
             address(roleBasedAccess),

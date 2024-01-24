@@ -69,7 +69,6 @@ contract ChannelRegistry is ChannelRegistrySignatures, Auth, Hash, Salt, IRoles 
     IdRegistry public idRegistry;
     DelegateRegistry public delegateRegistry;
     mapping(uint256 userId => uint256 channelId) public channelCountForUser;
-    mapping(bytes32 channelId => string uri) public uriForChannel;
     mapping(bytes32 channelId => address pointer) public dataForChannel;
     mapping(bytes32 channelId => address logic) public logicForChannel;
 
@@ -90,19 +89,22 @@ contract ChannelRegistry is ChannelRegistrySignatures, Auth, Hash, Salt, IRoles 
     // NOTE: potentially consider returning the data pointer too? this done in itemRegistry
     function newChannel(uint256 userId, bytes calldata data, address logic, bytes calldata logicInit)
         public
-        returns (bytes32 channelId)
+        returns (bytes32 channelId, address pointer)
     {
         // Check authorization status for msg.sender    
         address sender = _auth(userId, msg.sender, this.newChannel.selector);
         // Create new channel
-        channelId = _unsafeNewChannel(sender, userId, data, logic, logicInit);
+        (channelId, pointer) = _unsafeNewChannel(sender, userId, data, logic, logicInit);
     }
 
-    function updateChannelData(uint256 userId, bytes32 channelId, bytes calldata data) public {
+    function updateChannelData(uint256 userId, bytes32 channelId, bytes calldata data) 
+        public
+        returns (address pointer)
+    {
         // Check authorization status for msg.sender    
         address sender = _auth(userId, msg.sender, this.updateChannelData.selector);
         // Update channel data
-        _unsafeUpdateChannelData(sender, userId, channelId, data);
+        pointer = _unsafeUpdateChannelData(sender, userId, channelId, data);
     }
 
     function updateChannelLogic(uint256 userId, bytes32 channelId, address logic, bytes calldata logicInit) public {
@@ -124,13 +126,13 @@ contract ChannelRegistry is ChannelRegistrySignatures, Auth, Hash, Salt, IRoles 
         bytes calldata logicInit,
         uint256 deadline,
         bytes calldata sig
-    ) public returns (bytes32 channelId) {
+    ) public returns (bytes32 channelId, address pointer) {
         // Verify valid transaction being generated on behalf of signer
         _verifyNewChannelSig(userId, logic, signer, NEW_CHANNEL_TYPEHASH, deadline, sig);
         // Check authorization status for signer  
         address authorizedSigner = _auth(userId, signer, this.newChannel.selector);
         // Create new channel
-        channelId = _unsafeNewChannel(authorizedSigner, userId, data, logic, logicInit);
+        (channelId, pointer) = _unsafeNewChannel(authorizedSigner, userId, data, logic, logicInit);
     }
 
     function updateChannelDataFor(
@@ -206,11 +208,11 @@ contract ChannelRegistry is ChannelRegistrySignatures, Auth, Hash, Salt, IRoles 
         bytes calldata data,
         address logic,
         bytes calldata logicInit
-    ) internal returns (bytes32 channelId) {
+    ) internal returns (bytes32 channelId, address pointer) {
         // Increment user channel count + generate channelId
         channelId = _generateHash(userId, ++channelCountForUser[userId], CHANNEL_SALT);
         // Store channel data
-        address pointer = dataForChannel[channelId] = SSTORE2.write(data);
+        pointer = dataForChannel[channelId] = SSTORE2.write(data);
         // Setup channel logic
         logicForChannel[channelId] = logic;
         ILogic(logic).initializeWithData(userId, channelId, logicInit);
