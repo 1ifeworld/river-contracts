@@ -20,16 +20,17 @@ contract RiverSetupScript is Script {
     RoleBasedAccess public roleBasedAccess;
     StringRenderer public stringRenderer;
     NftRenderer public nftRenderer;
-    
+
     function setUp() public {}
 
     function run() public {
         bytes32 privateKeyBytes = vm.envBytes32("PRIVATE_KEY");
         uint256 deployerPrivateKey = uint256(privateKeyBytes);
+        VmSafe.Wallet memory deployerWallet = vm.createWallet(deployerPrivateKey);
 
         vm.startBroadcast(deployerPrivateKey);
         
-        idRegistry = new IdRegistry();  
+        idRegistry = new IdRegistry(deployerWallet.addr);  
         delegateRegistry = new DelegateRegistry(address(idRegistry));          
         channelRegistry = new ChannelRegistry(address(idRegistry), address(delegateRegistry));  
         itemRegistry = new ItemRegistry(address(idRegistry), address(delegateRegistry), address(channelRegistry));  
