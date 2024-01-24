@@ -10,10 +10,10 @@ abstract contract Trust is Ownable2Step {
     //////////////////////////////////////////////////////////////*/
 
     /// @dev Revert when an unauthorized caller calls a trusted function.
-    error OnlyTrusted();
+    error Only_Trusted();
 
     /// @dev Revert when an invalid address is provided as input.
-    error InvalidAddress();
+    error Invalid_Address();
 
     /*//////////////////////////////////////////////////////////////
                                  EVENTS
@@ -58,7 +58,7 @@ abstract contract Trust is Ownable2Step {
      */
     modifier trust() {
         if (trustedOnly == 1) {
-            if (msg.sender != trustedCaller) revert OnlyTrusted();
+            if (msg.sender != trustedCaller) revert Only_Trusted();
         }
         _;
     }
@@ -102,7 +102,7 @@ abstract contract Trust is Ownable2Step {
      *      to set the trusted caller at construction time.
      */
     function _setTrustedCaller(address _trustedCaller) internal {
-        if (_trustedCaller == address(0)) revert InvalidAddress();
+        if (_trustedCaller == address(0)) revert Invalid_Address();
 
         emit SetTrustedCaller(trustedCaller, _trustedCaller, msg.sender);
         trustedCaller = _trustedCaller;

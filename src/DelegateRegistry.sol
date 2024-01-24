@@ -2,14 +2,15 @@
 pragma solidity 0.8.23;
 
 import {IdRegistry} from "./IdRegistry.sol";
-import {DelegateRegistrySignatures} from "./abstract/signatures/DelegateRegistrySignatures.sol";
+import {IDelegateRegistry} from "./interfaces/IDelegateRegistry.sol";
+import {Signatures} from "./abstract/Signatures.sol";
 import {EIP712} from "./abstract/EIP712.sol";
 
 /**
  * @title DelegateRegistry
  * @author Lifeworld
  */
-contract DelegateRegistry is DelegateRegistrySignatures {
+contract DelegateRegistry is IDelegateRegistry, Signatures, EIP712 {
 
     //////////////////////////////////////////////////
     // ERRORS
@@ -72,7 +73,7 @@ contract DelegateRegistry is DelegateRegistrySignatures {
     // TODO: add sig based function
     function setDelegatesFor(uint256 userId, Delegation[] memory dels, address signer, uint256 deadline, bytes calldata sig) external {
         // verify signer check
-        _verifySetDelegatesSig(userId, dels, signer, SET_DELEGATES_TYPEHASH, deadline, sig);        
+        _verifySetDelegatesSig(userId, dels, signer, deadline, sig);        
         // Check authorization status for msg.sender. Must be custody address
         if (signer != idRegistry.custodyOf(userId)) revert Unauthorized_Signer_For_User(userId);
         // Process delegations
@@ -82,4 +83,23 @@ contract DelegateRegistry is DelegateRegistrySignatures {
         // Emit for indexing
         emit Delegations(signer, userId, dels);
     }    
+
+    ////////////////////////////////////////////////////////////////
+    // SIGNATURE VERIFICATION HELPERS
+    ////////////////////////////////////////////////////////////////
+
+    function _verifySetDelegatesSig(         
+        uint256 userId, 
+        Delegation[] memory dels,
+        address signer,
+        uint256 deadline, 
+        bytes memory sig
+    ) internal view {
+        _verifySig(
+            _hashTypedDataV4(keccak256(abi.encode(SET_DELEGATES_TYPEHASH, userId, dels, deadline))),
+            signer,
+            deadline,
+            sig
+        );
+    }          
 }   

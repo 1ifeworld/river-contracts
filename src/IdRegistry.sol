@@ -7,7 +7,7 @@ import {IIdRegistry} from "./interfaces/IIdRegistry.sol";
 import {Auth} from "./abstract/Auth.sol";
 import {Hash} from "./abstract/Hash.sol";
 import {Salt} from "./abstract/Salt.sol";
-import {Signatures} from "./abstract/signatures/Signatures.sol";
+import {Signatures} from "./abstract/Signatures.sol";
 import {EIP712} from "./abstract/EIP712.sol";
 import {Nonces} from "./abstract/Nonces.sol";
 import {Trust} from "./abstract/Trust.sol";
@@ -16,7 +16,7 @@ import {Trust} from "./abstract/Trust.sol";
  * @title IdRegistry
  * @author Lifeworld
  */
-contract IdRegistry is IIdRegistry, EIP712, Signatures, Nonces, Trust, Pausable {
+contract IdRegistry is IIdRegistry, Trust, Pausable, Signatures, EIP712, Nonces {
     ////////////////////////////////////////////////////////////////
     // CONSTANTS
     ////////////////////////////////////////////////////////////////
@@ -79,7 +79,7 @@ contract IdRegistry is IIdRegistry, EIP712, Signatures, Nonces, Trust, Pausable 
     }
 
     // NOTE: will revert if msg.sender != Trust.trustedCaller
-    function _register(address to, address recovery) internal returns (uint256 rid) {
+    function _register(address to, address recovery) internal trust returns (uint256 rid) {
         rid = _unsafeRegister(to, recovery);
         emit Register(to, idCounter, recovery);
     }

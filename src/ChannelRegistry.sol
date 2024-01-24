@@ -8,7 +8,7 @@ import {DelegateRegistry} from "./DelegateRegistry.sol";
 import {IRenderer} from "./interfaces/IRenderer.sol";
 import {ILogic} from "./interfaces/ILogic.sol";
 import {IRoles} from "./interfaces/IRoles.sol";
-import {ChannelRegistrySignatures} from "./abstract/signatures/ChannelRegistrySignatures.sol";
+import {Signatures} from "./abstract/Signatures.sol";
 import {EIP712} from "./abstract/EIP712.sol";
 import {Auth} from "./abstract/Auth.sol";
 import {Salt} from "./abstract/Salt.sol";
@@ -18,7 +18,7 @@ import {Hash} from "./abstract/Hash.sol";
  * @title ChannelRegistry
  * @author Lifeworld
  */
-contract ChannelRegistry is ChannelRegistrySignatures, Auth, Hash, Salt, IRoles {
+contract ChannelRegistry is Signatures, EIP712, Auth, Hash, Salt, IRoles {
 
     //////////////////////////////////////////////////
     // TYPES
@@ -128,7 +128,7 @@ contract ChannelRegistry is ChannelRegistrySignatures, Auth, Hash, Salt, IRoles 
         bytes calldata sig
     ) public returns (bytes32 channelId, address pointer) {
         // Verify valid transaction being generated on behalf of signer
-        _verifyNewChannelSig(userId, logic, signer, NEW_CHANNEL_TYPEHASH, deadline, sig);
+        _verifyNewChannelSig(userId, logic, signer, deadline, sig);
         // Check authorization status for signer  
         address authorizedSigner = _auth(userId, signer, this.newChannel.selector);
         // Create new channel
@@ -144,7 +144,7 @@ contract ChannelRegistry is ChannelRegistrySignatures, Auth, Hash, Salt, IRoles 
         bytes calldata sig
     ) public returns (address pointer) {
         // Verify valid transaction being generated on behalf of signer
-        _verifyUpdateChannelDataSig(userId, channelId, signer, UPDATE_CHANNEL_DATA_TYPEHASH, deadline, sig);
+        _verifyUpdateChannelDataSig(userId, channelId, signer, deadline, sig);
         // Check authorization status for signer  
         address authorizedSigner = _auth(userId, signer, this.updateChannelData.selector);
         // Update channel data
@@ -161,7 +161,7 @@ contract ChannelRegistry is ChannelRegistrySignatures, Auth, Hash, Salt, IRoles 
         bytes calldata sig
     ) public {
         // Verify valid transaction being generated on behalf of signer
-        _verifyUpdateChannelLogicSig(userId, channelId, logic, signer, UPDATE_CHANNEL_LOGIC_TYPEHASH, deadline, sig);
+        _verifyUpdateChannelLogicSig(userId, channelId, logic, signer, deadline, sig);
         // Check authorization status for signer  
         address authorizedSigner = _auth(userId, signer, this.updateChannelLogic.selector);
         // Update channel logic
@@ -251,6 +251,56 @@ contract ChannelRegistry is ChannelRegistrySignatures, Auth, Hash, Salt, IRoles 
         // Emit for indexing
         emit UpdateLogic(sender, userId, channelId, logic);
     }
+
+    ////////////////////////////////////////////////////////////////
+    // SIGNATURE VERIFICATION HELPERS
+    ////////////////////////////////////////////////////////////////
+
+    function _verifyNewChannelSig(         
+        uint256 userId, 
+        address logic,
+        address signer,
+        uint256 deadline, 
+        bytes memory sig
+    ) internal view {
+        _verifySig(
+            _hashTypedDataV4(keccak256(abi.encode(NEW_CHANNEL_TYPEHASH, userId, logic, deadline))),
+            signer,
+            deadline,
+            sig
+        );
+    }         
+
+    function _verifyUpdateChannelDataSig(         
+        uint256 userId, 
+        bytes32 channelHash,
+        address signer,
+        uint256 deadline, 
+        bytes memory sig
+    ) internal view {
+        _verifySig(
+            _hashTypedDataV4(keccak256(abi.encode(UPDATE_CHANNEL_DATA_TYPEHASH, userId, channelHash, deadline))),
+            signer,
+            deadline,
+            sig
+        );
+    }             
+
+    function _verifyUpdateChannelLogicSig(         
+        uint256 userId, 
+        bytes32 channelHash,
+        address logic,
+        address signer,
+        uint256 deadline, 
+        bytes memory sig
+    ) internal view {
+        _verifySig(
+            _hashTypedDataV4(keccak256(abi.encode(UPDATE_CHANNEL_LOGIC_TYPEHASH, userId, channelHash, logic, deadline))),
+            signer,
+            deadline,
+            sig
+        );
+    }                    
 
     //////////////////////////////////////////////////
     // AUTH HELPER

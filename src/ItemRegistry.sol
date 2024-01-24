@@ -13,7 +13,7 @@ import {Auth} from "./abstract/Auth.sol";
 import {Hash} from "./abstract/Hash.sol";
 import {Salt} from "./abstract/Salt.sol";
 import {EIP712} from "./abstract/EIP712.sol";
-import {ItemRegistrySignatures} from "./abstract/signatures/ItemRegistrySignatures.sol";
+import {Signatures} from "./abstract/Signatures.sol";
 // import {Nonces} from "./abstract/Nonces.sol";
 
 /*
@@ -26,7 +26,7 @@ import {ItemRegistrySignatures} from "./abstract/signatures/ItemRegistrySignatur
  * @title ItemRegistry
  * @author Lifeworld
  */
-contract ItemRegistry is IItemRegistry, IRoles, ItemRegistrySignatures, Auth, Hash, Salt {
+contract ItemRegistry is IItemRegistry, IRoles, EIP712, Signatures, Auth, Hash, Salt {
     //////////////////////////////////////////////////
     // TYPES
     //////////////////////////////////////////////////
@@ -66,13 +66,14 @@ contract ItemRegistry is IItemRegistry, IRoles, ItemRegistrySignatures, Auth, Ha
     // CONSTANTS
     //////////////////////////////////////////////////
 
-    bytes32 public constant NEW_ITEMS_TYPEHASH = keccak256("NewItems(uint256 userId,Init[] inits,uint256 deadline)");
+    bytes32 public constant NEW_ITEMS_TYPEHASH = 
+        keccak256("NewItems(uint256 userId,Init[] inits,uint256 deadline)");
 
     bytes32 public constant ADD_TYPEHASH =
         keccak256("Add(uint256 userId,bytes32 itemId,bytes32 channelId,uint256 deadline)");
 
     bytes32 public constant ADD_BATCH_TYPEHASH =
-        keccak256("Add(uint256 userId,bytes32 itemId,bytes32[] channelIds,uint256 deadline)");
+        keccak256("Add(uint256 userId,bytes32 itemId,bytes32[] channelIds,uint256 deadline)");        
 
     bytes32 public constant REMOVE_TYPEHASH =
         keccak256("Remove(uint256 userId,bytes32 itemId,bytes32 channelId,uint256 deadline)");
@@ -183,7 +184,7 @@ contract ItemRegistry is IItemRegistry, IRoles, ItemRegistrySignatures, Auth, Ha
         returns (bytes32[] memory itemIds, address[] memory pointers)
     {
         // Verify valid transaction being generated on behalf of signer
-        _verifyNewItemsSig(userId, inits, signer, NEW_ITEMS_TYPEHASH, deadline, sig);
+        _verifyNewItemsSig(userId, inits, signer, deadline, sig);
         // Check authorization status for signer   
         address authorizedSigner = _auth(userId, signer, this.newItems.selector);
         // Create new items
@@ -199,7 +200,7 @@ contract ItemRegistry is IItemRegistry, IRoles, ItemRegistrySignatures, Auth, Ha
         bytes calldata sig
     ) public {
         // Verify valid transaction being generated on behalf of signer
-        _verifyAddSig(userId, itemId, channelId, signer, ADD_TYPEHASH, deadline, sig);
+        _verifyAddSig(userId, itemId, channelId, signer, deadline, sig);
         // Check authorization status for signer   
         address authorizedSigner = _auth(userId, signer, this.add.selector);
         // Check user for add access + process add
@@ -215,9 +216,9 @@ contract ItemRegistry is IItemRegistry, IRoles, ItemRegistrySignatures, Auth, Ha
         bytes calldata sig
     ) public {
         // Verify valid transaction being generated on behalf of signer
-        _verifyAddBatchSig(userId, itemId, channelIds, signer, ADD_BATCH_TYPEHASH, deadline, sig);
+        _verifyAddBatchSig(userId, itemId, channelIds, signer, deadline, sig);
         // Check authorization status for signer   
-        address authorizedSigner = _auth(userId, signer, this.addBatch.selector);
+        address authorizedSigner = _auth(userId, signer, this.add.selector);
         // Check user for add access + process add
         for (uint256 i; i < channelIds.length; ++i) {
             _unsafeAdd(authorizedSigner, userId, itemId, channelIds[i]);
@@ -233,7 +234,7 @@ contract ItemRegistry is IItemRegistry, IRoles, ItemRegistrySignatures, Auth, Ha
         bytes calldata sig
     ) public {
         // Verify valid transaction being generated on behalf of signer
-        _verifyRemoveSig(userId, itemId, channelId, signer, REMOVE_TYPEHASH, deadline, sig);
+        _verifyRemoveSig(userId, itemId, channelId, signer, deadline, sig);
         // Check authorization status for signer   
         address authorizedSigner = _auth(userId, signer, this.remove.selector);
         // Check user for remove access + process remove
@@ -250,7 +251,7 @@ contract ItemRegistry is IItemRegistry, IRoles, ItemRegistrySignatures, Auth, Ha
         bytes calldata sig
     ) external returns (address pointer) {
         // Verify valid transaction being generated on behalf of signer
-        _verifyEditSig(userId, itemId, data, signer, EDIT_TYPEHASH, deadline, sig);
+        _verifyEditSig(userId, itemId, data, signer, deadline, sig);
         // Check authorization status for signer   
         address authorizedSigner = _auth(userId, signer, this.edit.selector);
         // Check user for edit access + process edit
@@ -267,7 +268,7 @@ contract ItemRegistry is IItemRegistry, IRoles, ItemRegistrySignatures, Auth, Ha
         bytes calldata sig
     ) public {
         // Verify valid transaction being generated on behalf of signer
-        _verifyUpdateAdminsSig(userId, itemId, userIds, statuses, signer, UPDATE_ADMINS_TYPEHASH, deadline, sig);
+        _verifyUpdateAdminsSig(userId, itemId, userIds, statuses, signer, deadline, sig);
         // Check authorization status for signer   
         address authorizedSigner = _auth(userId, signer, this.updateAdmins.selector);
         // Check user for updateAdmins access + process updateAdmins
@@ -364,6 +365,113 @@ contract ItemRegistry is IItemRegistry, IRoles, ItemRegistrySignatures, Auth, Ha
         // Emit for indexing
         emit UpdateAdmins(sender, userId, itemId, userIds, statuses);
     }
+
+    ////////////////////////////////////////////////////////////////
+    // SIGNATURE VERIFICATION HELPERS
+    ////////////////////////////////////////////////////////////////
+
+    function _verifyNewItemsSig(         
+        uint256 userId, 
+        IItemRegistry.Init[] memory inits, 
+        address signer,
+        uint256 deadline, 
+        bytes memory sig
+    ) internal view {
+        _verifySig(
+            _hashTypedDataV4(keccak256(abi.encode(NEW_ITEMS_TYPEHASH, userId, inits, deadline))),
+            signer,
+            deadline,
+            sig
+        );
+    }          
+
+    function _verifyAddSig(        
+        uint256 userId, 
+        bytes32 itemHash,
+        bytes32 channelHash,
+        address signer, 
+        uint256 deadline, 
+        bytes memory sig
+    ) internal view {
+        _verifySig(
+            _hashTypedDataV4(keccak256(abi.encode(ADD_TYPEHASH, userId, itemHash, channelHash, deadline))),
+            signer,
+            deadline,
+            sig
+        );
+    }  
+
+    function _verifyAddBatchSig(
+        uint256 userId, 
+        bytes32 itemHash,
+        bytes32[] calldata channelHashes,
+        address signer, 
+        uint256 deadline, 
+        bytes memory sig
+    ) internal view {
+        _verifySig(
+            _hashTypedDataV4(keccak256(abi.encode(ADD_BATCH_TYPEHASH, userId, itemHash, channelHashes, deadline))),
+            signer,
+            deadline,
+            sig
+        );
+    }             
+
+    function _verifyRemoveSig(        
+        uint256 userId, 
+        bytes32 itemHash,
+        bytes32 channelHash,
+        address signer, 
+        uint256 deadline, 
+        bytes memory sig
+    ) internal view {
+        _verifySig(
+            _hashTypedDataV4(keccak256(abi.encode(REMOVE_TYPEHASH, userId, itemHash, channelHash, deadline))),
+            signer,
+            deadline,
+            sig
+        );
+    }      
+
+    function _verifyEditSig(        
+        uint256 userId, 
+        bytes32 itemHash,
+        bytes calldata data,
+        address signer, 
+        uint256 deadline, 
+        bytes memory sig
+    ) internal view {
+        _verifySig(
+            _hashTypedDataV4(keccak256(abi.encode(EDIT_TYPEHASH, userId, itemHash, data, deadline))),
+            signer,
+            deadline,
+            sig
+        );
+    }     
+
+    function _verifyUpdateAdminsSig(
+        uint256 userId, 
+        bytes32 itemHash,
+        uint256[] memory userIds,
+        bool[] memory stauses,
+        address signer, 
+        uint256 deadline, 
+        bytes memory sig
+    ) internal view {
+        _verifySig(
+            _hashTypedDataV4(keccak256(abi.encode(
+                UPDATE_ADMINS_TYPEHASH, 
+                userId, 
+                itemHash, 
+                userIds, 
+                stauses, 
+                deadline
+            ))),
+            signer,
+            deadline,
+            sig
+        );
+    }          
 
     //////////////////////////////////////////////////
     // AUTH HELPER
