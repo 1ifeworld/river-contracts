@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.23;
 
+import {SignatureChecker} from "openzeppelin-contracts/utils/cryptography/SignatureChecker.sol";
 import {Pausable} from "openzeppelin-contracts/utils/Pausable.sol";
 import {IIdRegistry} from "./interfaces/IIdRegistry.sol";
 import {Auth} from "./abstract/Auth.sol";
@@ -10,7 +11,6 @@ import {Signatures} from "./abstract/signatures/Signatures.sol";
 import {EIP712} from "./abstract/EIP712.sol";
 import {Nonces} from "./abstract/Nonces.sol";
 import {Trust} from "./abstract/Trust.sol";
-import {SignatureChecker} from "openzeppelin-contracts/utils/cryptography/SignatureChecker.sol";
 
 /**
  * @title IdRegistry
