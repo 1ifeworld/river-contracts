@@ -51,7 +51,7 @@ contract IdRegistry is IIdRegistry, EIP712, Signatures, Nonces, Trust, Pausable 
     ////////////////////////////////////////////////////////////////
 
     /**
-     * @notice Set the owner of the contract to the provided _owner.
+     * @notice Set the owner of the contract to the provided _initialOwner.
      *
      * @param _initialOwner Initial owner address.
      *
@@ -303,9 +303,9 @@ contract IdRegistry is IIdRegistry, EIP712, Signatures, Nonces, Trust, Pausable 
         _unpause();
     }
 
-    /*//////////////////////////////////////////////////////////////
-                                  VIEWS
-    //////////////////////////////////////////////////////////////*/
+    ////////////////////////////////////////////////////////////////
+    // VIEWS
+    ////////////////////////////////////////////////////////////////
 
     function verifyRidSignature(
         address custodyAddress,
