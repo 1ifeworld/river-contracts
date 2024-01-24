@@ -3,9 +3,8 @@ pragma solidity 0.8.23;
 
 import {Ownable2Step} from "openzeppelin-contracts/access/Ownable2Step.sol";
 import {Ownable} from "openzeppelin-contracts/access/Ownable.sol";
-import {Test, console2} from "forge-std/Test.sol";
 
-abstract contract Trust is Ownable2Step, Test {
+abstract contract Trust is Ownable2Step {
     /*//////////////////////////////////////////////////////////////
                                  ERRORS
     //////////////////////////////////////////////////////////////*/
