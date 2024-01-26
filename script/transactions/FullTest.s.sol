@@ -32,9 +32,10 @@ contract FullTestScript is Script {
         vm.startBroadcast(deployerPrivateKey);
 
         // register id        
-        idRegistry.register(deployerWallet.addr);
+        // idRegistry.register(deployerWallet.addr);
         // prep data for new channel
         uint256 userId = 1;
+        bytes memory channelData = abi.encodePacked(address(stringRenderer), bytes("ipfs://bafybeiczsscdsbs7ffqz55asqdf3smv6klcw3gofszvwlyarci47bgf354"));        
         uint256[] memory userIds = new uint256[](1);
         userIds[0] = userId;
         IRoles.Roles[] memory roles = new RoleBasedAccess.Roles[](1);
@@ -43,7 +44,7 @@ contract FullTestScript is Script {
         // create new channel
         (bytes32 channelHash,) = channelRegistry.newChannel(
             userId,
-            "ipfs://bafybeiczsscdsbs7ffqz55asqdf3smv6klcw3gofszvwlyarci47bgf354",
+            channelData,
             address(roleBasedAccess),
             logicInit
         );
