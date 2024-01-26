@@ -14,24 +14,25 @@ import {IRoles} from "../../src/interfaces/IRoles.sol";
 
 contract FullTestScript is Script {
 
-    IdRegistry public idRegistry = IdRegistry(0x73c68a5Cc6d6586CA5Bd2F0c6f8eC8524f33557b);  
-    DelegateRegistry public delegateRegistry = DelegateRegistry(0xDc4D28a3010ad7aAfFc24c377Ebb7Cb4d32A1Ae9);    
-    ChannelRegistry public channelRegistry = ChannelRegistry(0x0dE97a5bc300d20A0D629179cF678296177854E8);
-    ItemRegistry public itemRegistry = ItemRegistry(0xf35776f159614B573C2Ae10F95407ed8b70D4C73);
-    RoleBasedAccess public roleBasedAccess = RoleBasedAccess(0x412CAEe8a5EE5741bED459951C091f8FfaA14778);
-    StringRenderer public stringRenderer = StringRenderer(0x1358b4111fbfD1929D3D47cfab2f00bF134e3918);
-    NftRenderer public nftRenderer = NftRenderer(0xc71780165ecEF5ba96B71b01B2ecA1F107A0B8c4);  
+    IdRegistry public idRegistry = IdRegistry(0xd35fF289853947472b22773E323D6239C32e1E7A);  
+    DelegateRegistry public delegateRegistry = DelegateRegistry(0x45c05c7b7a5782BfB32553FecBCcCcBC36F21578);    
+    ChannelRegistry public channelRegistry = ChannelRegistry(0x339513226Afd92B309837Bad402c6D3ADDE9Ad24);
+    ItemRegistry public itemRegistry = ItemRegistry(0xEc341633d600Bdad8E704729AE95049DDfec6c6f);
+    RoleBasedAccess public roleBasedAccess = RoleBasedAccess(0x05aD6cA9C2b3F71a6B30A8C7d414C95E10EC0217);
+    StringRenderer public stringRenderer = StringRenderer(0xdc151805e5A93284e1E337Bf5B7c4060AB9BC5Be);
+    NftRenderer public nftRenderer = NftRenderer(0xFFc1FA270C80104e6AC6CB5Ec31662Fe071C81bD);  
     
     function setUp() public {}
 
     function run() public {
         bytes32 privateKeyBytes = vm.envBytes32("PRIVATE_KEY");
         uint256 deployerPrivateKey = uint256(privateKeyBytes);
+        VmSafe.Wallet memory deployerWallet = vm.createWallet(deployerPrivateKey);
 
         vm.startBroadcast(deployerPrivateKey);
 
-        // register id
-        // idRegistry.register(address(0));
+        // register id        
+        idRegistry.register(deployerWallet.addr);
         // prep data for new channel
         uint256 userId = 1;
         uint256[] memory userIds = new uint256[](1);

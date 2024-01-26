@@ -21,6 +21,13 @@ contract RiverSetupScript is Script {
     StringRenderer public stringRenderer;
     NftRenderer public nftRenderer;
 
+    struct Wallet {
+      address addr;
+      uint256 publicKeyX;
+      uint256 publicKeyY;
+      uint256 privateKey;        
+    }
+    
     function setUp() public {}
 
     function run() public {
@@ -31,6 +38,7 @@ contract RiverSetupScript is Script {
         vm.startBroadcast(deployerPrivateKey);
         
         idRegistry = new IdRegistry(deployerWallet.addr);  
+        idRegistry.setTrustedCaller(deployerWallet.addr);
         delegateRegistry = new DelegateRegistry(address(idRegistry));          
         channelRegistry = new ChannelRegistry(address(idRegistry), address(delegateRegistry));  
         itemRegistry = new ItemRegistry(address(idRegistry), address(delegateRegistry), address(channelRegistry));  
@@ -47,7 +55,12 @@ contract RiverSetupScript is Script {
 // source .env
 
 // forge script script/RiverSetupScript.s.sol:RiverSetupScript -vvvv --broadcast --fork-url http://localhost:8545
-// forge script script/RiverSetupScript.s.sol:RiverSetupScript -vvvv --rpc-url $RPC_URL --broadcast --verify --verifier blockscout --verifier-url https://explorerl2new-river-j5bpjduqfv.t.conduit.xyz/api\?
+// forge script script/RiverSetupScript.s.sol:RiverSetupScript -vvvv --rpc-url $RPC_URL --broadcast --verify --verifier blockscout --verifier-url https://explorerl2new-river-dev-2-d5hb5orqim.t.conduit.xyz/api\?
+
+// old: https://explorerl2new-river-j5bpjduqfv.t.conduit.xyz/api\?
+
 // forge script script/RiverSetupScript.s.sol:RiverSetupScript -vvvv --rpc-url $RPC_URL --broadcast  
                                                            
-// forge verify-contract 0x412CAEe8a5EE5741bED459951C091f8FfaA14778 src/logic/RoleBasedAccess.sol:RoleBasedAccess --verifier blockscout --verifier-url https://explorerl2new-river-j5bpjduqfv.t.conduit.xyz/api\?
+// old: forge verify-contract 0x412CAEe8a5EE5741bED459951C091f8FfaA14778 src/logic/RoleBasedAccess.sol:RoleBasedAccess --verifier blockscout --verifier-url https://explorerl2new-river-j5bpjduqfv.t.conduit.xyz/api\?
+
+// forge verify-contract 0xFFc1FA270C80104e6AC6CB5Ec31662Fe071C81bD src/renderer/NftRenderer.sol:NftRenderer --verifier blockscout --verifier-url https://explorerl2new-river-j5bpjduqfv.t.conduit.xyz/api\?
