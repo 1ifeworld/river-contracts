@@ -30,7 +30,7 @@ contract RoleBasedAccess is Auth, IRoles {
 
     IdRegistry public idRegistry;
     DelegateRegistry public delegateRegistry;
-    mapping(address target => mapping(uint256 userId => mapping(bytes32 channelHash => Roles))) public userRoleForChannel;
+    mapping(address target => mapping(bytes32 channelHash => mapping(uint256 userId => Roles))) public userRoleForChannel;
 
     //////////////////////////////////////////////////
     // CONSTRUCTOR
@@ -54,7 +54,7 @@ contract RoleBasedAccess is Auth, IRoles {
         if (userIds.length != roles.length) revert Input_Length_Mismatch();
         // Set roles
         for (uint256 i; i < userIds.length; ++i) {
-            userRoleForChannel[sender][userIds[i]][channelHash] = roles[i];
+            userRoleForChannel[sender][channelHash][userIds[i]] = roles[i];
         }
         // Emit for indexing
         emit RolesSet(sender, userId, userIds, channelHash, roles);
@@ -77,8 +77,8 @@ contract RoleBasedAccess is Auth, IRoles {
         if (userIds.length != roles.length) revert Input_Length_Mismatch();
         // Set roles
         for (uint256 i; i < userIds.length; ++i) {
-            if (userRoleForChannel[target][userIds[i]][channelHash] < Roles.ADMIN) revert Only_Admin();
-            userRoleForChannel[target][userIds[i]][channelHash] = roles[i];
+            if (userRoleForChannel[target][channelHash][userIds[i]] < Roles.ADMIN) revert Only_Admin();
+            userRoleForChannel[target][channelHash][userIds[i]] = roles[i];
         }
         // Emit for indexing
         emit RolesSet(sender, userId, userIds, channelHash, roles);
@@ -90,7 +90,7 @@ contract RoleBasedAccess is Auth, IRoles {
 
     // NOTE: Uses role based access for all `access` returns
     function access(uint256 userId, bytes32 channelId, uint256 /*access*/) external view returns (uint256) {
-        return uint256(userRoleForChannel[msg.sender][userId][channelId]);
+        return uint256(userRoleForChannel[msg.sender][channelId][userId]);
     }
 
     // NOTE: Uses role based access for all `access` returns
@@ -99,6 +99,6 @@ contract RoleBasedAccess is Auth, IRoles {
         view
         returns (uint256)
     {
-        return uint256(userRoleForChannel[target][userId][channelId]);
+        return uint256(userRoleForChannel[target][channelId][userId]);
     }
 }

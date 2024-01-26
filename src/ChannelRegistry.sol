@@ -75,6 +75,8 @@ contract ChannelRegistry is Signatures, EIP712, Auth, Hash, Salt, IRoles {
     //////////////////////////////////////////////////
     // CONSTRUCTOR
     //////////////////////////////////////////////////
+    
+    // TODO: add a "id registry + delegate registry setup + change event"
 
     constructor(address _idRegistry, address _delegateRegistry) EIP712("ChannelRegistry", "1") {
         self = address(this);
