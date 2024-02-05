@@ -120,6 +120,9 @@ contract ChannelRegistry is Signatures, EIP712, Auth, Hash, Salt, IRoles {
     // SIGNATURE BASED WRITES
     //////////////////////////////////////////////////
 
+    // TODO: 
+    //  move signer after logic init
+    //  rename data -> channelInit?
     function newChannelFor(
         address signer,
         uint256 userId,

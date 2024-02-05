@@ -34,6 +34,7 @@ contract IdRegistryTest is Test {
 
     // Set-up called before each test
     function setUp() public {
+        vm.chainId(3600855875265181);
         // accounts
         trusted = makeAccount("trusted");
         relayer = makeAccount("relayer");
@@ -53,12 +54,18 @@ contract IdRegistryTest is Test {
         // start prank as trusted caller
         vm.startPrank(trusted.addr);
         // generate registerfor signature
-        bytes memory sig = _signRegister(
+        (bytes32 hash, bytes memory sig) = _signRegister(
             user.key,
             user.addr,
             trusted.addr,
             _deadline()
         );
+        console2.logBytes32(hash);
+        console2.logBytes32(idRegistry.domainSeparatorV4());
+        // vm.etch(0xd35fF289853947472b22773E323D6239C32e1E7A, idRegistry.code);
+        // IdRegistry newIdRegistry = IdRegistry(0xd35fF289853947472b22773E323D6239C32e1E7A);
+        // console2.log(newIdRegistry.domainSeparatorV4());
+        // // console2.log(block.chainId);
         // Set up event tests
         vm.expectEmit(true, false, false, false, address(idRegistry));    
         // Emit event with expected value
@@ -92,11 +99,12 @@ contract IdRegistryTest is Test {
         address to,
         address recovery,
         uint256 deadline
-    ) internal returns (bytes memory signature) {
-        address signer = vm.addr(pk);
+    ) internal returns (bytes32 hash, bytes memory signature) {
+        address signer = vm.addr(pk);        
         bytes32 digest = idRegistry.hashTypedDataV4(
             keccak256(abi.encode(idRegistry.REGISTER_TYPEHASH(), to, recovery, idRegistry.nonces(signer), deadline))
         );
         signature = _sign(pk, digest);
+        hash = digest;
     }         
 }
