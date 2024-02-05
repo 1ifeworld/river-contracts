@@ -4,9 +4,6 @@ pragma solidity 0.8.23;
 import {SignatureChecker} from "openzeppelin-contracts/utils/cryptography/SignatureChecker.sol";
 import {Pausable} from "openzeppelin-contracts/utils/Pausable.sol";
 import {IIdRegistry} from "./interfaces/IIdRegistry.sol";
-import {Auth} from "./abstract/Auth.sol";
-import {Hash} from "./abstract/Hash.sol";
-import {Salt} from "./abstract/Salt.sol";
 import {Signatures} from "./abstract/Signatures.sol";
 import {EIP712} from "./abstract/EIP712.sol";
 import {Nonces} from "./abstract/Nonces.sol";
@@ -15,15 +12,17 @@ import {Trust} from "./abstract/Trust.sol";
 /**
  * @title IdRegistry
  * @author Lifeworld
+ * @notice This contract is a fork of Farcaster IdRegistry v3.0.0
  */
 contract IdRegistry is IIdRegistry, Trust, Pausable, Signatures, EIP712, Nonces {
+
     ////////////////////////////////////////////////////////////////
     // CONSTANTS
     ////////////////////////////////////////////////////////////////
 
-    string public constant NAME = "River ID";
+    string public constant NAME = "River Id";
 
-    string public constant VERSION = "2024.01.24";
+    string public constant VERSION = "2024.02.05";
 
     bytes32 public constant REGISTER_TYPEHASH =
         keccak256("Register(address to,address recovery,uint256 nonce,uint256 deadline)");          
@@ -42,8 +41,11 @@ contract IdRegistry is IIdRegistry, Trust, Pausable, Signatures, EIP712, Nonces 
     ////////////////////////////////////////////////////////////////
 
     uint256 public idCounter;
+
     mapping(address owner => uint256 rid) public idOf;
+
     mapping(uint256 rid => address owner) public custodyOf;
+    
     mapping(uint256 rid => address recovery) public recoveryOf;
 
     ////////////////////////////////////////////////////////////////
@@ -72,19 +74,21 @@ contract IdRegistry is IIdRegistry, Trust, Pausable, Signatures, EIP712, Nonces 
         address recovery, 
         uint256 deadline, 
         bytes calldata sig
-    ) external trust returns (uint256 rid) {
-        // Revert if signature is invalid
+    ) external returns (uint256 rid) {
+        /* Revert if signature is invalid */
         _verifyRegisterSig({to: to, recovery: recovery, deadline: deadline, sig: sig});
         return _register(to, recovery);
     }
 
-    // NOTE: will revert if msg.sender != Trust.trustedCaller
+    /**
+     * @dev Will revert if msg.sender is not a trusted caller
+     */
     function _register(address to, address recovery) internal trust returns (uint256 rid) {
         rid = _unsafeRegister(to, recovery);
         emit Register(to, idCounter, recovery);
     }
 
-    // NOTE: will revert if contract is PAUSED
+    /// @dev will revert if contract is paused
     function _unsafeRegister(address to, address recovery) internal whenNotPaused returns (uint256 rid) {
         /* Revert if the target(to) has an rid */
         if (idOf[to] != 0) revert Has_Id();
@@ -190,6 +194,7 @@ contract IdRegistry is IIdRegistry, Trust, Pausable, Signatures, EIP712, Nonces 
 
     /**
      * @dev Transfer the rid to another address without checking invariants.
+     * @dev Will revert if contract is paused     
      */
     function _unsafeTransfer(uint256 id, address from, address to) internal whenNotPaused {
         idOf[to] = id;
@@ -235,6 +240,7 @@ contract IdRegistry is IIdRegistry, Trust, Pausable, Signatures, EIP712, Nonces 
 
     /**
      * @dev Change recovery address without checking invariants.
+     * @dev Will revert if contract is paused
      */
     function _unsafeChangeRecovery(uint256 id, address recovery) internal whenNotPaused {
         /* Change the recovery address */
