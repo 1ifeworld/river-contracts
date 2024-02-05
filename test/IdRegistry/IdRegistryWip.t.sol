@@ -5,10 +5,6 @@ import {IdRegistry} from "../../src/IdRegistry.sol";
 import {IIdRegistry} from "../../src/interfaces/IIdRegistry.sol";
 import {IdRegistryTestSuite} from "./IdRegistryTestSuite.sol";
 
-/*
-    TODO: Missing event testing
-*/
-
 contract IdRegistryTest is IdRegistryTestSuite {       
 
     //////////////////////////////////////////////////
@@ -168,7 +164,7 @@ contract IdRegistryTest is IdRegistryTestSuite {
     // emit Transfer(from, to, 1);
 
     // vm.expectEmit();
-    // emit ChangeRecoveryAddress(fid, recovery);    
+    // emit ChangeRecoveryAddress(rid, recovery);    
 
     // success
     //      assert idOf from

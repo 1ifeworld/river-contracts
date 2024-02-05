@@ -3,13 +3,8 @@ pragma solidity 0.8.23;
 
 import {Test, console2} from "forge-std/Test.sol";
 
-import {IdRegistry} from "../src/IdRegistry.sol";
-import {IIdRegistry} from "../src/interfaces/IIdRegistry.sol";
-
-
-/*
-    TODO: Missing event testing
-*/
+import {IdRegistry} from "../../src/IdRegistry.sol";
+import {IIdRegistry} from "../../src/interfaces/IIdRegistry.sol";
 
 contract IdRegistryTest is Test {       
 
