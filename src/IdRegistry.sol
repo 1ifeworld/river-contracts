@@ -48,6 +48,37 @@ contract IdRegistry is IIdRegistry, Trust, Pausable, Signatures, EIP712, Nonces 
     
     mapping(uint256 rid => address recovery) public recoveryOf;
 
+    mapping(uint256 rid => address host) public reservedBy;
+
+    function reserve(address host) external returns (uint256 rid) {
+        /* Incrementing before assignment ensures that no one gets the 0 rid. */
+        rid = ++idCounter;
+        // set address whos signature will be required to claim
+        reservedBy[rid] = host;
+    }
+
+    function claim(uint256 rid, address recovery, uint256 deadline, bytes calldata hostSig) {
+        // look up host address for reserved it
+        address host = reservedBy[rid];        
+        // check if rservation has already been claimed has already claimed 
+        if (host == address(0)) revert Already_Claimed();
+        // make sure claimant doesnt already own rid
+        if (idOf[msg.sender] != 0) revert Has_Id();
+        // verify host signature
+        _verifySig({
+            digest: keccak256(abi.encode("CLAIM")),
+            signer: host,
+            deadline: deadline,
+            sig: hostSig
+        });
+        // update custody information
+        idOf[to] = rid;
+        custodyOf[rid] = to;
+        recoveryOf[rid] = recovery;
+        // clear host storage for id
+        delete reservedBy[rid]'
+    }
+
     ////////////////////////////////////////////////////////////////
     // CONSTRUCTOR
     ////////////////////////////////////////////////////////////////
