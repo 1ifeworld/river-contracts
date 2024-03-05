@@ -6,6 +6,7 @@ pragma solidity 0.8.23;
  * @author Lifeworld
  */
 interface IIdRegistry {
+
     //////////////////////////////////////////////////
     // ERRORS
     //////////////////////////////////////////////////
@@ -19,6 +20,9 @@ interface IIdRegistry {
     /// @dev Revert when the caller must have an rid but does not have one.
     error Has_No_Id();
 
+    /// @dev Revert when target rid has previously been claimed.
+    error Previously_Claimed();
+
     //////////////////////////////////////////////////
     // EVENTS
     //////////////////////////////////////////////////
@@ -26,31 +30,22 @@ interface IIdRegistry {
     /**
      * @dev Emit an event when a new River ID is registered.
      *
-     *      Hubs listen for this and update their address-to-rid mapping by adding `to` as the
-     *      current owner of `id`. Hubs assume the invariants:
-     *
-     *      1. Two Register events can never emit with the same `id`
-     *
-     *      2. Two Register(alice, ..., ...) cannot emit unless a Transfer(alice, bob, ...) emits
-     *          in between, where bob != alice.
-     *
-     * @param to       The custody address that owns the rid
+     * @param to       The custody address that owns the rid.
      * @param id       The rid that was registered.
      * @param recovery The address that can initiate a recovery request for the rid.
      */
     event Register(address indexed to, uint256 id, address recovery);
 
     /**
+     * @dev Emit an event when an rid is reserved by a host address
+     *
+     * @param to       The host address that reserves the rid.
+     * @param id       The rid that was reserved.
+     */
+    event Reserve(address indexed to, uint256 id);
+
+    /**
      * @dev Emit an event when an rid is transferred to a new custody address.
-     *
-     *      Hubs listen to this event and atomically change the current owner of `id`
-     *      from `from` to `to` in their address-to-rid mapping. Hubs assume the invariants:
-     *
-     *      1. A Transfer(..., alice, ...) cannot emit if the most recent event for alice is
-     *         Register (alice, ..., ...)
-     *
-     *      2. A Transfer(alice, ..., id) cannot emit unless the most recent event with that id is
-     *         Transfer(..., alice, id) or Register(alice, id, ...)
      *
      * @param from The custody address that previously owned the rid.
      * @param to   The custody address that now owns the rid.

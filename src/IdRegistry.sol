@@ -20,12 +20,15 @@ contract IdRegistry is IIdRegistry, Trust, Pausable, Signatures, EIP712, Nonces 
     // CONSTANTS
     ////////////////////////////////////////////////////////////////
 
-    string public constant NAME = "River Id";
+    string public constant NAME = "River IdRegistry";
 
-    string public constant VERSION = "2024.02.05";
+    string public constant VERSION = "2024.03.05";
 
     bytes32 public constant REGISTER_TYPEHASH =
         keccak256("Register(address to,address recovery,uint256 nonce,uint256 deadline)");          
+
+    bytes32 public constant CLAIM_TYPEHASH =
+        keccak256("Claim(uint256 rid, address to,address recovery,uint256 nonce,uint256 deadline)");          
 
     bytes32 public constant TRANSFER_TYPEHASH =
         keccak256("Transfer(uint256 rid,address to,uint256 nonce,uint256 deadline)");
@@ -49,35 +52,6 @@ contract IdRegistry is IIdRegistry, Trust, Pausable, Signatures, EIP712, Nonces 
     mapping(uint256 rid => address recovery) public recoveryOf;
 
     mapping(uint256 rid => address host) public reservedBy;
-
-    function reserve(address host) external returns (uint256 rid) {
-        /* Incrementing before assignment ensures that no one gets the 0 rid. */
-        rid = ++idCounter;
-        // set address whos signature will be required to claim
-        reservedBy[rid] = host;
-    }
-
-    function claim(uint256 rid, address recovery, uint256 deadline, bytes calldata hostSig) {
-        // look up host address for reserved it
-        address host = reservedBy[rid];        
-        // check if rservation has already been claimed has already claimed 
-        if (host == address(0)) revert Already_Claimed();
-        // make sure claimant doesnt already own rid
-        if (idOf[msg.sender] != 0) revert Has_Id();
-        // verify host signature
-        _verifySig({
-            digest: keccak256(abi.encode("CLAIM")),
-            signer: host,
-            deadline: deadline,
-            sig: hostSig
-        });
-        // update custody information
-        idOf[to] = rid;
-        custodyOf[rid] = to;
-        recoveryOf[rid] = recovery;
-        // clear host storage for id
-        delete reservedBy[rid]'
-    }
 
     ////////////////////////////////////////////////////////////////
     // CONSTRUCTOR
@@ -129,6 +103,68 @@ contract IdRegistry is IIdRegistry, Trust, Pausable, Signatures, EIP712, Nonces 
         idOf[to] = rid;
         custodyOf[rid] = to;
         recoveryOf[rid] = recovery;
+    }
+
+    ////////////////////////////////////////////////////////////////
+    // RESERVE + CLAIM LOGIC
+    ////////////////////////////////////////////////////////////////
+
+    function reserve(address host) external trust whenNotPaused returns (uint256 rid) {
+        /* Incrementing before assignment ensures that no one gets the 0 rid. */
+        rid = ++idCounter;
+        // Set host address whos signature will be required to claim rid
+        reservedBy[rid] = host;
+        // Emit for indexing
+        emit Reserve(host, rid);
+    }
+
+    // TODO: potentially remove `trust` modifier since its already gated 
+    //       by the preceding `reserve` call and limits developer flexibility
+    function claim(uint256 rid, address recovery) external trust whenNotPaused  {
+        // Lookup host for reserved rid
+        address host = reservedBy[rid];
+        // Check if rid has previously been claimed
+        if (host == address(0)) revert Previously_Claimed();
+        // Cache msg.sender
+        address sender = msg.sender;        
+        // Revert if registrant has an rid
+        if (idOf[sender] != 0) revert Has_Id();
+        // Register rid
+        idOf[sender] = rid;
+        custodyOf[rid] = sender;
+        recoveryOf[rid] = recovery;
+        emit Register(sender, rid, recovery);
+        // Clear reservation storage
+        delete reservedBy[rid];
+    }
+
+    // TODO: potentially remove `trust` modifier since its already gated 
+    //       by the preceding `reserve` call and limits developer flexibility
+    function claimFor(
+        uint256 rid, 
+        address to, 
+        address recovery, 
+        uint256 hostDeadline, 
+        bytes calldata hostSig, 
+        uint256 toDeadline, 
+        bytes calldata toSig
+    ) external trust whenNotPaused  {
+        // Lookup host for reserved rid
+        address host = reservedBy[rid];
+        // Check if rid has previously been claimed
+        if (host == address(0)) revert Previously_Claimed();
+        /* Revert if either signature is invalid */
+        _verifyClaimSig({rid: rid, to: to, recovery: recovery, deadline: hostDeadline, signer: host, sig: hostSig});    
+        _verifyClaimSig({rid: rid, to: to, recovery: recovery, deadline: toDeadline, signer: to, sig: toSig});      
+        // Revert if registrant target has an rid
+        if (idOf[to] != 0) revert Has_Id();
+        // Register rid
+        idOf[to] = rid;
+        custodyOf[rid] = to;
+        recoveryOf[rid] = recovery;        
+        emit Register(to, rid, recovery);
+        // Clear reservation storage
+        delete reservedBy[rid];
     }
 
     ////////////////////////////////////////////////////////////////
@@ -365,6 +401,15 @@ contract IdRegistry is IIdRegistry, Trust, Pausable, Signatures, EIP712, Nonces 
             sig
         );
     }    
+
+    function _verifyClaimSig(uint256 rid, address to, address recovery, uint256 deadline, address signer, bytes memory sig) internal {
+        _verifySig(
+            _hashTypedDataV4(keccak256(abi.encode(CLAIM_TYPEHASH, rid, to, recovery, _useNonce(to), deadline))),
+            signer,
+            deadline,
+            sig
+        );
+    }        
 
     function _verifyTransferSig(uint256 rid, address to, uint256 deadline, address signer, bytes memory sig) internal {
         _verifySig(
