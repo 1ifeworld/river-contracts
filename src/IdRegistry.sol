@@ -16,6 +16,8 @@ import {Trust} from "./abstract/Trust.sol";
  */
 contract IdRegistry is IIdRegistry, Trust, Pausable, Signatures, EIP712, Nonces {
 
+    // TODO: Add migration logic
+
     ////////////////////////////////////////////////////////////////
     // CONSTANTS
     ////////////////////////////////////////////////////////////////
