@@ -33,12 +33,13 @@ contract SmartWalletSignatureValidation is TestSuiteSetup {
         nonce = 0;
         owners.push(abi.encode(user.addr));
         owners.push(abi.encode(trusted.addr));
+        owners.push(passkeyOwner);
         verifier = new Mock6492Verifier();
         account = smartWalletfactory.createAccount(owners, nonce);
     }
 
     function test_deployFromFactoryEoaOwner() public {
-        assertEq(address(account), smartWalletfactory.getAddress(owners, 0));
+        assertEq(address(account), smartWalletfactory.getAddress(owners, nonce));
         bytes memory owner = account.ownerAtIndex(0);
         assertEq(user.addr, abi.decode(owner, (address)));
     }
@@ -67,6 +68,14 @@ contract SmartWalletSignatureValidation is TestSuiteSetup {
         2. clean up test suite for readability + functionality
         3. push up to github
     */
+
+    function test_deployFromFactoryPasskeyOwner() public {
+        assertEq(address(account), smartWalletfactory.getAddress(owners, nonce));
+        bytes memory owner = account.ownerAtIndex(2);
+        assertEq(passkeyOwner, owner);
+    }
+
+    function test_verifySmartAccountP256Sig() public {}
 
     // HELPERS
     function _prepareEoa6492Sig(Account memory _initialSigner, bytes[] memory _initialOwners)
