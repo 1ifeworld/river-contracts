@@ -39,13 +39,13 @@ contract SmartWalletSignatureValidation is TestSuiteSetup {
         account = smartWalletfactory.createAccount(owners, nonce);
     }
 
-    function test_deployFromFactoryEoaOwner() public {
+    function test_deployFromFactoryEoaOwner() public view {
         assertEq(address(account), smartWalletfactory.getAddress(owners, nonce));
         bytes memory owner = account.ownerAtIndex(0);
         assertEq(user.addr, abi.decode(owner, (address)));
     }
 
-    function test_verifySmartAccountEoa712Sig() public {
+    function test_verifySmartAccountEoa712Sig() public view {
         (bytes32 hash, bytes memory encodedWrapper) = _prepareEoa712Sig(user);
         bytes4 returnBytes = account.isValidSignature(hash, encodedWrapper);
         assertEq(returnBytes, ERC1271_SUCCESS);
@@ -70,13 +70,13 @@ contract SmartWalletSignatureValidation is TestSuiteSetup {
         3. push up to github
     */
 
-    function test_deployFromFactoryPasskeyOwner() public {
+    function test_deployFromFactoryPasskeyOwner() public view {
         assertEq(address(account), smartWalletfactory.getAddress(owners, nonce));
         bytes memory owner = account.ownerAtIndex(2);
         assertEq(passkeyOwner, owner);
     }
 
-    function test_verifySmartAccountP256Sig() public {
+    function test_verifySmartAccountP256Sig() public view {
         (bytes32 digest, bytes memory sig) = _prepareP256Sig();
         bytes4 ret = account.isValidSignature(digest, sig);
         assertEq(ret, bytes4(0x1626ba7e));
@@ -118,7 +118,7 @@ contract SmartWalletSignatureValidation is TestSuiteSetup {
     // TODO: this function will only work with the global account variable
     //      trying to use this to prepare sigs to be verified by other acccounts will not work
     //      due to how replaySafeHash works
-    function _prepareEoa712Sig(Account memory eoaOwner) public returns (bytes32, bytes memory) {
+    function _prepareEoa712Sig(Account memory eoaOwner) public view returns (bytes32, bytes memory) {
         bytes32 digest = 0x15fa6f8c855db1dccbb8a42eef3a7b83f11d29758e84aed37312527165d5eea4;
         // NOTE: we aren't actually using the account contract here
         //       we are just accessing replaySafeHash from it
@@ -131,10 +131,10 @@ contract SmartWalletSignatureValidation is TestSuiteSetup {
         return (digest, encodedWrapper);
     }
 
-    function _prepareP256Sig() public returns (bytes32, bytes memory) {
+    function _prepareP256Sig() public view returns (bytes32, bytes memory) {
         bytes32 digest = keccak256("mock p256 hash");
-        bytes32 challenge = account.replaySafeHash(digest);
-        WebAuthnInfo memory webAuthn = Utils.getWebAuthnStruct(challenge);
+        bytes32 toSign = account.replaySafeHash(digest);
+        WebAuthnInfo memory webAuthn = Utils.getWebAuthnStruct(toSign);
         (bytes32 r, bytes32 s) = vm.signP256(passkeyPrivateKey, webAuthn.messageHash);
         s = bytes32(Utils.normalizeS(uint256(s)));
         bytes memory sig = abi.encode(
