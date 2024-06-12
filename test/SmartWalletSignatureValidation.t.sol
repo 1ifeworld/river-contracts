@@ -10,6 +10,7 @@ import {ECDSA} from "openzeppelin-contracts/contracts/utils/cryptography/ECDSA.s
 import {SignatureChecker} from "openzeppelin-contracts/contracts/utils/cryptography/SignatureChecker.sol";
 
 import {Mock6492Verifier} from "./Mocks/Mock6492Verifier.sol";
+import {WebAuthn} from "webauthn-sol/WebAuthn.sol";
 
 contract SmartWalletSignatureValidation is TestSuiteSetup {
     CoinbaseSmartWalletFactory smartWalletfactory = new CoinbaseSmartWalletFactory(address(new CoinbaseSmartWallet()));
@@ -75,7 +76,32 @@ contract SmartWalletSignatureValidation is TestSuiteSetup {
         assertEq(passkeyOwner, owner);
     }
 
-    function test_verifySmartAccountP256Sig() public {}
+    function test_verifySmartAccountP256Sig() public {
+        bytes32 hash = 0x15fa6f8c855db1dccbb8a42eef3a7b83f11d29758e84aed37312527165d5eec5;
+        bytes32 challenge = account.replaySafeHash(hash);
+        WebAuthnInfo memory webAuthn = Utils.getWebAuthnStruct(challenge);
+        (bytes32 r, bytes32 s) = vm.signP256(passkeyPrivateKey, webAuthn.messageHash);
+        s = bytes32(Utils.normalizeS(uint256(s)));
+        bytes memory sig = abi.encode(
+            CoinbaseSmartWallet.SignatureWrapper({
+                ownerIndex: 2,
+                signatureData: abi.encode(
+                    WebAuthn.WebAuthnAuth({
+                        authenticatorData: webAuthn.authenticatorData,
+                        clientDataJSON: webAuthn.clientDataJSON,
+                        typeIndex: 1,
+                        challengeIndex: 23,
+                        r: uint256(r),
+                        s: uint256(s)
+                    })
+                )
+            })
+        );
+
+        // check a valid signature
+        bytes4 ret = account.isValidSignature(hash, sig);
+        assertEq(ret, bytes4(0x1626ba7e));
+    }
 
     // HELPERS
     function _prepareEoa6492Sig(Account memory _initialSigner, bytes[] memory _initialOwners)
