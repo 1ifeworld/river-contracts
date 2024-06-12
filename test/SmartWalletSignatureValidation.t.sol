@@ -77,29 +77,8 @@ contract SmartWalletSignatureValidation is TestSuiteSetup {
     }
 
     function test_verifySmartAccountP256Sig() public {
-        bytes32 hash = 0x15fa6f8c855db1dccbb8a42eef3a7b83f11d29758e84aed37312527165d5eec5;
-        bytes32 challenge = account.replaySafeHash(hash);
-        WebAuthnInfo memory webAuthn = Utils.getWebAuthnStruct(challenge);
-        (bytes32 r, bytes32 s) = vm.signP256(passkeyPrivateKey, webAuthn.messageHash);
-        s = bytes32(Utils.normalizeS(uint256(s)));
-        bytes memory sig = abi.encode(
-            CoinbaseSmartWallet.SignatureWrapper({
-                ownerIndex: 2,
-                signatureData: abi.encode(
-                    WebAuthn.WebAuthnAuth({
-                        authenticatorData: webAuthn.authenticatorData,
-                        clientDataJSON: webAuthn.clientDataJSON,
-                        typeIndex: 1,
-                        challengeIndex: 23,
-                        r: uint256(r),
-                        s: uint256(s)
-                    })
-                )
-            })
-        );
-
-        // check a valid signature
-        bytes4 ret = account.isValidSignature(hash, sig);
+        (bytes32 digest, bytes memory sig) = _prepareP256Sig();
+        bytes4 ret = account.isValidSignature(digest, sig);
         assertEq(ret, bytes4(0x1626ba7e));
     }
 
@@ -150,5 +129,29 @@ contract SmartWalletSignatureValidation is TestSuiteSetup {
         SignatureWrapper memory wrapper = SignatureWrapper({ownerIndex: 0, signatureData: eoaSigForOwner});
         bytes memory encodedWrapper = abi.encode(wrapper);
         return (digest, encodedWrapper);
+    }
+
+    function _prepareP256Sig() public returns (bytes32, bytes memory) {
+        bytes32 digest = keccak256("mock p256 hash");
+        bytes32 challenge = account.replaySafeHash(digest);
+        WebAuthnInfo memory webAuthn = Utils.getWebAuthnStruct(challenge);
+        (bytes32 r, bytes32 s) = vm.signP256(passkeyPrivateKey, webAuthn.messageHash);
+        s = bytes32(Utils.normalizeS(uint256(s)));
+        bytes memory sig = abi.encode(
+            CoinbaseSmartWallet.SignatureWrapper({
+                ownerIndex: 2,
+                signatureData: abi.encode(
+                    WebAuthn.WebAuthnAuth({
+                        authenticatorData: webAuthn.authenticatorData,
+                        clientDataJSON: webAuthn.clientDataJSON,
+                        typeIndex: 1,
+                        challengeIndex: 23,
+                        r: uint256(r),
+                        s: uint256(s)
+                    })
+                )
+            })
+        );
+        return (digest, sig);
     }
 }
