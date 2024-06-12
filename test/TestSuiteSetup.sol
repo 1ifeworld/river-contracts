@@ -28,7 +28,7 @@ abstract contract TestSuiteSetup is Test {
                                  HELPERS
     //////////////////////////////////////////////////////////////*/
 
-    function _boundPk(uint256 pk) internal view returns (uint256) {
+    function _boundPk(uint256 pk) internal pure returns (uint256) {
         return bound(pk, 1, SECP_256K1_ORDER - 1);
     }
 
@@ -36,7 +36,7 @@ abstract contract TestSuiteSetup is Test {
         return block.timestamp + uint256(bound(deadline, 1, type(uint40).max));
     }
 
-    function _sign(uint256 privateKey, bytes32 digest) internal returns (bytes memory sig) {
+    function _sign(uint256 privateKey, bytes32 digest) internal pure returns (bytes memory sig) {
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(privateKey, digest);
         sig = abi.encodePacked(r, s, v);
         assertEq(sig.length, 65);
