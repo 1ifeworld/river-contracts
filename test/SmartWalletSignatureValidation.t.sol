@@ -82,6 +82,12 @@ contract SmartWalletSignatureValidation is TestSuiteSetup {
         assertEq(ret, bytes4(0x1626ba7e));
     }
 
+    function test_verifySmartAccount6492P256Sig() public {
+        (address signer, bytes32 digest, bytes memory sigFor6492) = _prepare6492P256Sig();
+        bool result = verifier.isValidSig(signer, digest, sigFor6492);
+        assertEq(true, result);
+    }
+
     // HELPERS
     function _prepareEoa6492Sig(Account memory _initialSigner, bytes[] memory _initialOwners)
         public
@@ -153,5 +159,37 @@ contract SmartWalletSignatureValidation is TestSuiteSetup {
             })
         );
         return (digest, sig);
+    }
+
+    function _prepare6492P256Sig() public returns (address, bytes32, bytes memory) {
+        bytes32 digest = keccak256("mock p256 hash");
+        CoinbaseSmartWallet undeployedLocalAcct = CoinbaseSmartWallet(payable(smartWalletfactory.getAddress(owners, 0)));
+        ERC1271InputGenerator generator = new ERC1271InputGenerator(
+            undeployedLocalAcct,
+            digest,
+            address(smartWalletfactory),
+            abi.encodeWithSignature("createAccount(bytes[],uint256)", owners, 0)
+        );
+        WebAuthnInfo memory webAuthn = Utils.getWebAuthnStruct(bytes32(address(generator).code));
+        (bytes32 r, bytes32 s) = vm.signP256(passkeyPrivateKey, webAuthn.messageHash);
+        s = bytes32(Utils.normalizeS(uint256(s)));
+
+        bytes memory sigFor6492 = abi.encode(
+            CoinbaseSmartWallet.SignatureWrapper({
+                ownerIndex: 2,
+                signatureData: abi.encode(
+                    WebAuthn.WebAuthnAuth({
+                        authenticatorData: webAuthn.authenticatorData,
+                        clientDataJSON: webAuthn.clientDataJSON,
+                        typeIndex: 1,
+                        challengeIndex: 23,
+                        r: uint256(r),
+                        s: uint256(s)
+                    })
+                )
+            })
+        );
+
+        return (address(undeployedLocalAcct), digest, sigFor6492);
     }
 }
