@@ -18,6 +18,7 @@ contract SmartWalletSignatureValidation is TestSuiteSetup {
     Mock6492Verifier verifier;
     CoinbaseSmartWallet account;
     uint256 nonce;
+    uint256 passkeyOwnerIndex;
 
     struct SignatureWrapper {
         /// @dev The index of the owner that signed, see `MultiOwnable.ownerAtIndex`
@@ -35,6 +36,7 @@ contract SmartWalletSignatureValidation is TestSuiteSetup {
         owners.push(abi.encode(user.addr));
         owners.push(abi.encode(trusted.addr));
         owners.push(passkeyOwner);
+        passkeyOwnerIndex = 2;
         verifier = new Mock6492Verifier();
         account = smartWalletfactory.createAccount(owners, nonce);
     }
@@ -145,7 +147,7 @@ contract SmartWalletSignatureValidation is TestSuiteSetup {
         s = bytes32(Utils.normalizeS(uint256(s)));
         bytes memory sig = abi.encode(
             CoinbaseSmartWallet.SignatureWrapper({
-                ownerIndex: 2,
+                ownerIndex: passkeyOwnerIndex,
                 signatureData: abi.encode(
                     WebAuthn.WebAuthnAuth({
                         authenticatorData: webAuthn.authenticatorData,
@@ -176,7 +178,7 @@ contract SmartWalletSignatureValidation is TestSuiteSetup {
 
         bytes memory sigFor6492 = abi.encode(
             CoinbaseSmartWallet.SignatureWrapper({
-                ownerIndex: 2,
+                ownerIndex: passkeyOwnerIndex,
                 signatureData: abi.encode(
                     WebAuthn.WebAuthnAuth({
                         authenticatorData: webAuthn.authenticatorData,
