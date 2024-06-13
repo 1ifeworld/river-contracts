@@ -1,7 +1,7 @@
 {
-  "11155111": {
-    "CoinbaseSmartWallet": "0x7c5Dad8851FD97D57452FF1927F3Ff62DF866544",
-    "CoinbaseSmartWalletFactory": "0x3FE8FC47FeD9f93B4d4a484e81896c6A8F3E874e",
-    "Mock6492Verifier": "0x199f7922393F1AaA53757a2C1f23b328955FDFb2"
+  "11155420": {
+    "CoinbaseSmartWallet": "0x66Fc5534b1A5521dCA263DCDF44a315eFDAa33C2",
+    "CoinbaseSmartWalletFactory": "0xabc14A381ab1BC4750eb08D11E5e29506e68c1b9",
+    "Mock6492Verifier": "0x76379783717d3aBA4da7A712C5996cB9Fe468F03"
   }
 }
