@@ -4,10 +4,5 @@
   },
   "42170": {
     "PostGateway": "0x423a602F5e551A25b28eb33eB56B961590aD5290"
-  },
-  "11155111": {
-    "CoinbaseSmartWallet": "0x7c5Dad8851FD97D57452FF1927F3Ff62DF866544",
-    "CoinbaseSmartWalletFactory": "0x3FE8FC47FeD9f93B4d4a484e81896c6A8F3E874e",
-    "Mock6492Verifier": "0x199f7922393F1AaA53757a2C1f23b328955FDFb2"
   }
 }
