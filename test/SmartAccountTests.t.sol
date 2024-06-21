@@ -194,4 +194,37 @@ contract SmartWalletSignatureValidation is TestSuiteSetup {
 
         return (address(undeployedLocalAcct), digest, sigFor6492);
     }
+
+
+
+
+
+
+
+    // bytes challenge = abi.encode(0x6454ad9229833dd1eadcd33dd782a4ca476caae9f535c7a57e13c4131a6a1850);
+    // bytes challenge = abi.encode(0xf631058a3ba1116acce12396fad0a125b5041c43f8e15723709f81aa8d5f4ccf);
+
+    function test_safari() public {
+        uint256 x = 30244708688309919677569886957912731198129078400964522906942980088228172369352;
+        uint256 y = 85115680486173964600348175480743578652400648939086283276039309814227777412949;
+        // uint256 x = 28573233055232466711029625910063034642429572463461595413086259353299906450061;        
+        // uint256 y = 39367742072897599771788408398752356480431855827262528811857788332151452825281;
+        WebAuthn.WebAuthnAuth memory auth = WebAuthn.WebAuthnAuth({
+            // authenticatorData: hex"49960de5880e8c687434170f6476605b8fe4aeb9a28632c7995cf3ba831d97630500000101",
+            authenticatorData: hex"49960de5880e8c687434170f6476605b8fe4aeb9a28632c7995cf3ba831d97631900000000",
+            // clientDataJSON: string.concat(
+            //     '{"type":"webauthn.get","challenge":"', Base64Url.encode(challenge), '","origin":"http://localhost:3005"}'
+            // ),
+            // clientDataJSON: "{type:webauthn.get,challenge:ZFStkimDPdHq3NM914Kkykdsqun1NcelfhPEExpqGFA,origin:http://localhost:8081}",
+            clientDataJSON: "{type:webauthn.get,challenge:Eg,origin:http://localhost:8081}",
+            challengeIndex: 23,
+            typeIndex: 1,
+            // r: 43684192885701841787131392247364253107519555363555461570655060745499568693242,
+            r: 73396795033680543686572560637862858395050875993898693824787047558107084248906,
+            // s: 22655632649588629308599201066602670461698485748654492451178007896016452673579
+            s: 102800634548387712854952698226392037958674589942381642018119459263400000737063
+        });
+        assertTrue(auth.typeIndex == 1);
+        // assertTrue(WebAuthn.verify("Eg", false, auth, x, y));
+    }    
 }
