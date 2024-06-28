@@ -165,6 +165,12 @@ contract SmartWalletSignatureValidation is TestSuiteSetup {
 
     function _prepare6492P256Sig() public returns (address, bytes32, bytes memory) {
         bytes32 digest = keccak256("mock p256 hash");
+        bytes[] memory _intialOwners = new bytes[](1);
+        _intialOwners[0] = passkeyOwner;
+        bytes memory accountInitCalldata = abi.encodeCall(
+            CoinbaseSmartWalletFactory.createAccount,
+            (_intialOwners, 0) // owners, nonce
+        );
         CoinbaseSmartWallet undeployedLocalAcct = CoinbaseSmartWallet(payable(smartWalletfactory.getAddress(owners, 0)));
         ERC1271InputGenerator generator = new ERC1271InputGenerator(
             undeployedLocalAcct,
@@ -176,7 +182,7 @@ contract SmartWalletSignatureValidation is TestSuiteSetup {
         (bytes32 r, bytes32 s) = vm.signP256(passkeyPrivateKey, webAuthn.messageHash);
         s = bytes32(Utils.normalizeS(uint256(s)));
 
-        bytes memory sigFor6492 = abi.encode(
+        bytes memory encodedSignatureWrapper = abi.encode(
             CoinbaseSmartWallet.SignatureWrapper({
                 ownerIndex: passkeyOwnerIndex,
                 signatureData: abi.encode(
@@ -192,6 +198,10 @@ contract SmartWalletSignatureValidation is TestSuiteSetup {
             })
         );
 
+        bytes memory sigFor6492 = bytes.concat(
+            abi.encode(address(smartWalletfactory), accountInitCalldata, encodedSignatureWrapper),
+            ERC6492_DETECTION_SUFFIX
+        );
         return (address(undeployedLocalAcct), digest, sigFor6492);
     }
 }
