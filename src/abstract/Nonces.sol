@@ -2,15 +2,16 @@
 pragma solidity 0.8.24;
 
 import {Nonces as NoncesBase} from "openzeppelin-contracts/utils/Nonces.sol";
-import {INonces} from "../interfaces/abstract/INonces.sol";
 
-abstract contract Nonces is INonces, NoncesBase {
+abstract contract Nonces is NoncesBase {
     //////////////////////////////////////////////////
     // NONCE MANAGEMENT
     ////////////////////////////////////////////////// 
 
     /**
-     * @inheritdoc INonces
+     * @notice Increase caller's nonce, invalidating previous signatures.
+     *
+     * @return uint256 The caller's new nonce.
      */
     function useNonce() external returns (uint256) {
         return _useNonce(msg.sender);

@@ -2,12 +2,21 @@
 pragma solidity 0.8.24;
 
 import {SignatureCheckerLib} from "solady/utils/SignatureCheckerLib.sol";
-import {ISignatures} from "../interfaces/abstract/ISignatures.sol";
 
-abstract contract Signatures is ISignatures {
+abstract contract Signatures {
+
+    //////////////////////////////////////////////////
+    // ERRORS
+    ////////////////////////////////////////////////// 
+
+    /// @dev Revert when the signature provided is invalid.
+    error InvalidSignature();
+
+    /// @dev Revert when the block.timestamp is ahead of the signature deadline.
+    error SignatureExpired();    
     
     //////////////////////////////////////////////////
-    // GENERIC HELPER
+    // GENERIC HELPERS
     ////////////////////////////////////////////////// 
 
     function _verifySig(bytes32 digest, address signer, bytes memory sig) internal {
@@ -20,15 +29,6 @@ abstract contract Signatures is ISignatures {
         }
     }
 
-    function _verifySigWithReturn(bytes32 digest, address signer, bytes memory sig) internal returns (bool) {
-        // ERC1271 sig validation for EOAs or accounts with code
-        if (SignatureCheckerLib.isValidSignatureNow(signer, digest, sig)) return true;
-        // ERC6492 sig validation for predeploy accounts
-        if (SignatureCheckerLib.isValidERC6492SignatureNow(signer, digest, sig)) return true;
-        // Both sig verification attempts failed. Return false
-        return false;
-    }    
-
     function _verifySigWithDeadline(bytes32 digest, address signer, uint256 deadline, bytes memory sig) internal {
         if (block.timestamp > deadline) revert SignatureExpired();
         // ERC1271 sig validation for EOAs or accounts with code
@@ -39,4 +39,13 @@ abstract contract Signatures is ISignatures {
             }
         }
     }    
+
+    function _verifySigWithReturn(bytes32 digest, address signer, bytes memory sig) internal returns (bool) {
+        // ERC1271 sig validation for EOAs or accounts with code
+        if (SignatureCheckerLib.isValidSignatureNow(signer, digest, sig)) return true;
+        // ERC6492 sig validation for predeploy accounts
+        if (SignatureCheckerLib.isValidERC6492SignatureNow(signer, digest, sig)) return true;
+        // Both sig verification attempts failed. Return false
+        return false;
+    }        
 }
