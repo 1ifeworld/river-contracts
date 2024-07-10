@@ -45,7 +45,7 @@ contract IdRegistryTest is Test {
     //////////////////////////////////////////////////    
 
     function test_sigBased_registerFor() public {
-        // start prank as trusted caller
+        // start prank as trusted calle
         vm.startPrank(trusted.addr);
         // generate registerfor signature
         bytes memory sig = _signRegister(
