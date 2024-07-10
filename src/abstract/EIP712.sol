@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.24;
+pragma solidity 0.8.23;
 
-import {EIP712 as EIP712Base} from "openzeppelin-contracts/utils/cryptography/EIP712.sol";
+import {EIP712 as EIP712Base} from "@openzeppelin/utils/cryptography/EIP712.sol";
 
 abstract contract EIP712 is EIP712Base {
     constructor(string memory name, string memory version) EIP712Base(name, version) {}

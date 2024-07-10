@@ -1,2 +1,4 @@
-openzeppelin-contracts/=lib/openzeppelin-contracts/contracts/
-solady/=lib/solady/src/
+
+@openzeppelin/=lib/openzeppelin-contracts/contracts/
+@solady/=lib/solady/src/
+@smart-wallet/=lib/smart-wallet/src/

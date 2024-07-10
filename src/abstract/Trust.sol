@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.24;
+pragma solidity 0.8.23;
 
-import {Ownable2Step} from "openzeppelin-contracts/access/Ownable2Step.sol";
-import {Ownable} from "openzeppelin-contracts/access/Ownable.sol";
+import {Ownable2Step} from "@openzeppelin/access/Ownable2Step.sol";
+import {Ownable} from "@openzeppelin/access/Ownable.sol";
 
 abstract contract Trust is Ownable2Step {
     /*//////////////////////////////////////////////////////////////

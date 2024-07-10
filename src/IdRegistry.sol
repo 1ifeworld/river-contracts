@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.24;
+pragma solidity 0.8.23;
 
-import {SignatureChecker} from "openzeppelin-contracts/utils/cryptography/SignatureChecker.sol";
-import {Pausable} from "openzeppelin-contracts/utils/Pausable.sol";
+import {SignatureChecker} from "@openzeppelin/utils/cryptography/SignatureChecker.sol";
+import {Pausable} from "@openzeppelin/utils/Pausable.sol";
 import {IIdRegistry} from "./interfaces/IIdRegistry.sol";
 import {Signatures} from "./abstract/Signatures.sol";
 import {EIP712} from "./abstract/EIP712.sol";

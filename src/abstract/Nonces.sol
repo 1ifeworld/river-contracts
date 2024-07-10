@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.24;
+pragma solidity 0.8.23;
 
-import {Nonces as NoncesBase} from "openzeppelin-contracts/utils/Nonces.sol";
+import {Nonces as NoncesBase} from "@openzeppelin/utils/Nonces.sol";
 
 abstract contract Nonces is NoncesBase {
     //////////////////////////////////////////////////

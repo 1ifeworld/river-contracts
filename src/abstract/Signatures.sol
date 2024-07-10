@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.24;
+pragma solidity 0.8.23;
 
-import {SignatureCheckerLib} from "solady/utils/SignatureCheckerLib.sol";
+import {SignatureCheckerLib} from "@solady/utils/SignatureCheckerLib.sol";
 
 abstract contract Signatures {
 
