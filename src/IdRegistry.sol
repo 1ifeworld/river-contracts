@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.23;
+pragma solidity 0.8.24;
 
 import {SignatureChecker} from "openzeppelin-contracts/utils/cryptography/SignatureChecker.sol";
 import {Pausable} from "openzeppelin-contracts/utils/Pausable.sol";
@@ -313,13 +313,16 @@ contract IdRegistry is IIdRegistry, Trust, Pausable, Signatures, EIP712, Nonces 
     // VIEWS
     ////////////////////////////////////////////////////////////////
 
+    // TODO: need to test if this works
+    //       also what will it look like on etherscan? a write call that always reverts?
+    //       do we need to add the revert in ourselves?
     function verifyRidSignature(
         address custodyAddress,
         uint256 rid,
         bytes32 digest,
         bytes calldata sig
-    ) external view returns (bool isValid) {
-        isValid = idOf[custodyAddress] == rid && SignatureChecker.isValidSignatureNow(custodyAddress, digest, sig);
+    ) external returns (bool isValid) {
+        isValid = idOf[custodyAddress] == rid && _verifySigWithReturn(digest, custodyAddress, sig);
     }    
 
     ////////////////////////////////////////////////////////////////
@@ -327,7 +330,7 @@ contract IdRegistry is IIdRegistry, Trust, Pausable, Signatures, EIP712, Nonces 
     ////////////////////////////////////////////////////////////////
 
     function _verifyRegisterSig(address to, address recovery, uint256 deadline, bytes memory sig) internal {
-        _verifySig(
+        _verifySigWithDeadline(
             _hashTypedDataV4(keccak256(abi.encode(REGISTER_TYPEHASH, to, recovery, _useNonce(to), deadline))),
             to,
             deadline,
@@ -336,7 +339,7 @@ contract IdRegistry is IIdRegistry, Trust, Pausable, Signatures, EIP712, Nonces 
     }    
 
     function _verifyTransferSig(uint256 rid, address to, uint256 deadline, address signer, bytes memory sig) internal {
-        _verifySig(
+        _verifySigWithDeadline(
             _hashTypedDataV4(keccak256(abi.encode(TRANSFER_TYPEHASH, rid, to, _useNonce(signer), deadline))),
             signer,
             deadline,
@@ -352,7 +355,7 @@ contract IdRegistry is IIdRegistry, Trust, Pausable, Signatures, EIP712, Nonces 
         address signer,
         bytes memory sig
     ) internal {
-        _verifySig(
+        _verifySigWithDeadline(
             _hashTypedDataV4(
                 keccak256(
                     abi.encode(TRANSFER_AND_CHANGE_RECOVERY_TYPEHASH, rid, to, recovery, _useNonce(signer), deadline)
@@ -372,7 +375,7 @@ contract IdRegistry is IIdRegistry, Trust, Pausable, Signatures, EIP712, Nonces 
         address signer,
         bytes memory sig
     ) internal {
-        _verifySig(
+        _verifySigWithDeadline(
             _hashTypedDataV4(
                 keccak256(abi.encode(CHANGE_RECOVERY_ADDRESS_TYPEHASH, rid, from, to, _useNonce(signer), deadline))
             ),

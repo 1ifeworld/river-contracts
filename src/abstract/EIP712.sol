@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.23;
+pragma solidity 0.8.24;
 
 import {EIP712 as EIP712Base} from "openzeppelin-contracts/utils/cryptography/EIP712.sol";
 import {IEIP712} from "../interfaces/abstract/IEIP712.sol";
