@@ -10,9 +10,18 @@ abstract contract TestSuiteSetup is Test {
                                 CONSTANTS
     //////////////////////////////////////////////////////////////*/
 
+    struct SignatureWrapper {
+        /// @dev The index of the owner that signed, see `MultiOwnable.ownerAtIndex`
+        uint256 ownerIndex;
+        /// @dev If `MultiOwnable.ownerAtIndex` is an Ethereum address, this should be `abi.encodePacked(r, s, v)`
+        ///      If `MultiOwnable.ownerAtIndex` is a public key, this should be `abi.encode(WebAuthnAuth)`.
+        bytes signatureData;
+    }    
+
     uint256 constant SECP_256K1_ORDER = 0xfffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141;
 
     Account public trusted = makeAccount("trusted");
+    Account public recovery = makeAccount("recovery");
     Account public relayer = makeAccount("relayer");
     Account public user = makeAccount("user");
     Account public malicious = makeAccount("malicious");
@@ -26,6 +35,10 @@ abstract contract TestSuiteSetup is Test {
     /*//////////////////////////////////////////////////////////////
                                  HELPERS
     //////////////////////////////////////////////////////////////*/
+
+    function _deadline() internal view returns (uint256 deadline) {
+        deadline = block.timestamp + 1;
+    }    
 
     function _boundPk(uint256 pk) internal pure returns (uint256) {
         return bound(pk, 1, SECP_256K1_ORDER - 1);

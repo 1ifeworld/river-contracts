@@ -12,21 +12,13 @@ import {SignatureChecker} from "@openzeppelin/utils/cryptography/SignatureChecke
 import "../TestSuiteSetup.sol";
 import {Mock6492Verifier} from "../Mocks/Mock6492Verifier.sol";
 
-contract SmartWalletTest is TestSuiteSetup {
+contract SmartWalletTest is Test, TestSuiteSetup {
     Mock6492Verifier verifier;
     CoinbaseSmartWalletFactory factory;
     bytes[] owners;
     CoinbaseSmartWallet account;
     uint256 nonce;
     uint256 passkeyOwnerIndex;
-
-    struct SignatureWrapper {
-        /// @dev The index of the owner that signed, see `MultiOwnable.ownerAtIndex`
-        uint256 ownerIndex;
-        /// @dev If `MultiOwnable.ownerAtIndex` is an Ethereum address, this should be `abi.encodePacked(r, s, v)`
-        ///      If `MultiOwnable.ownerAtIndex` is a public key, this should be `abi.encode(WebAuthnAuth)`.
-        bytes signatureData;
-    }
 
     bytes32 public ERC6492_DETECTION_SUFFIX = 0x6492649264926492649264926492649264926492649264926492649264926492;
     bytes4 public ERC1271_SUCCESS = 0x1626ba7e;

@@ -2,15 +2,18 @@
 pragma solidity 0.8.23;
 
 import {Test, console2} from "forge-std/Test.sol";
+import "../TestSuiteSetup.sol";
 
+import {CoinbaseSmartWalletFactory} from "@smart-wallet/CoinbaseSmartWalletFactory.sol";
+import {CoinbaseSmartWallet} from "@smart-wallet/CoinbaseSmartWallet.sol";
 import {IdRegistry} from "../../src/IdRegistry.sol";
 import {IIdRegistry} from "../../src/interfaces/IIdRegistry.sol";
 
-contract IdRegistryTest is Test {       
+contract IdRegistryTest is Test, TestSuiteSetup {       
 
     //////////////////////////////////////////////////
     // CONSTANTS
-    //////////////////////////////////////////////////   
+    //////////////////////////////////////////////////       
 
     //////////////////////////////////////////////////
     // STORAGE
@@ -18,23 +21,28 @@ contract IdRegistryTest is Test {
 
     /* contracts + accounts */
     IdRegistry public idRegistry;
-    Account public trusted;
-    Account public relayer;
-    Account public user;     
-    Account public malicious;     
+    CoinbaseSmartWalletFactory smartWalletFactory;
+    CoinbaseSmartWallet smartWallet;
+    bytes[] owners;
+    uint256 nonce;
 
     //////////////////////////////////////////////////
     // SETUP
     //////////////////////////////////////////////////   
 
     // Set-up called before each test
-    function setUp() public {
-        // accounts
-        trusted = makeAccount("trusted");
-        relayer = makeAccount("relayer");
-        user = makeAccount("user");
-        malicious = makeAccount("malicious");        
-        // contracts
+    function setUp() public {   
+        // setup fork
+        uint256 baseSepoliaFork = vm.createFork('https://sepolia.base.org');
+        vm.selectFork(baseSepoliaFork);
+        smartWalletFactory = CoinbaseSmartWalletFactory(0x0BA5ED0c6AA8c49038F819E587E2633c4A9F428a);       
+        // variavles
+        nonce = 0;
+        owners.push(abi.encode(user.addr));
+        owners.push(abi.encode(trusted.addr));
+        owners.push(passkeyOwner);
+        smartWallet = smartWalletFactory.createAccount(owners, nonce);
+        // id registry
         idRegistry = new IdRegistry(trusted.addr);  
         vm.prank(trusted.addr);
         idRegistry.setTrustedCaller(trusted.addr);
@@ -44,7 +52,7 @@ contract IdRegistryTest is Test {
     // SIGNATURE BASED WRITES
     //////////////////////////////////////////////////    
 
-    function test_sigBased_registerFor() public {
+    function test_eoa_registerFor() public {
         // start prank as trusted calle
         vm.startPrank(trusted.addr);
         // generate registerfor signature
@@ -68,19 +76,32 @@ contract IdRegistryTest is Test {
         assertEq(idRegistry.recoveryOf(rid), trusted.addr);
     }
 
-    // //////////////////////////////////////////////////
-    // // HELPERS
-    // //////////////////////////////////////////////////  
-
-    function _deadline() internal view returns (uint256 deadline) {
-        deadline = block.timestamp + 1;
+    function test_smartAccountEoaSigner_registerFor() public {
+        // start prank as trusted calle
+        vm.startPrank(trusted.addr);
+        // get deadline
+        uint256 deadline = _deadline();
+        // generate registerFor signature for eoaSigner on smart wallet
+        bytes memory sig = _prepareEoaSigForSmartWallet(smartWallet, user, recovery.addr, deadline);
+        // Set up event tests
+        vm.expectEmit(true, false, false, false, address(idRegistry));    
+        // Emit event with expected value
+        emit IIdRegistry.Register(address(smartWallet), 1, recovery.addr);            
+        // register id to user
+        uint256 rid = idRegistry.registerFor(address(smartWallet), recovery.addr, deadline, sig);
+        vm.stopPrank();
+        // asserts
+        assertEq(idRegistry.idCounter(), rid);
+        assertEq(idRegistry.idOf(address(smartWallet)), rid);
+        assertEq(idRegistry.custodyOf(rid), address(smartWallet));
+        assertEq(idRegistry.recoveryOf(rid), recovery.addr);
     }
 
-    function _sign(uint256 privateKey, bytes32 digest) internal returns (bytes memory sig) {
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(privateKey, digest);
-        sig = abi.encodePacked(r, s, v);
-        assertEq(sig.length, 65);
-    }                       
+
+    // //////////////////////////////////////////////////
+    // // HELPERS
+    // //////////////////////////////////////////////////               
+
 
     function _signRegister(
         uint256 pk,
@@ -94,4 +115,30 @@ contract IdRegistryTest is Test {
         );
         signature = _sign(pk, digest);
     }         
+
+    function _prepareEoaSigForSmartWallet(CoinbaseSmartWallet _smartWallet, Account memory eoaOwner, address recovery, uint256 deadline) public view returns (bytes memory) {
+        bytes32 idRegistryRegisterForHash = idRegistry.hashTypedDataV4(
+            keccak256(abi.encode(idRegistry.REGISTER_TYPEHASH(), address(_smartWallet), recovery, idRegistry.nonces(address(_smartWallet)), deadline))
+        );        
+        bytes32 smartWalletSafeHash = _smartWallet.replaySafeHash(idRegistryRegisterForHash);
+        bytes memory eoaSig = _sign(eoaOwner.key, smartWalletSafeHash);
+        SignatureWrapper memory wrapper = SignatureWrapper({ownerIndex: 0, signatureData: eoaSig});
+        bytes memory encodedWrapper = abi.encode(wrapper);
+        return encodedWrapper;                
+    }        
+
+
+    // function _prepareEoaSigForSmartAccount(CoinbaseSmartWallet account, Account memory eoaOwner) public view returns (bytes32, bytes memory) {
+    //     bytes32 digest = 0x15fa6f8c855db1dccbb8a42eef3a7b83f11d29758e84aed37312527165d5eea4;
+    //     // NOTE: we aren't actually using the account contract here
+    //     //       we are just accessing replaySafeHash from it
+    //     // TODO: cleaner version of test would let us access replaySafeHash from a library or
+    //     //       separately set function
+    //     bytes32 toSign = account.replaySafeHash(digest);
+    //     bytes memory eoaSigForOwner = _sign(eoaOwner.key, toSign);
+    //     SignatureWrapper memory wrapper = SignatureWrapper({ownerIndex: 0, signatureData: eoaSigForOwner});
+    //     bytes memory encodedWrapper = abi.encode(wrapper);
+    //     return (digest, encodedWrapper);
+    // }    
+    
 }
