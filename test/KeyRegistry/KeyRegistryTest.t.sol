@@ -22,6 +22,9 @@ contract KeyRegistryTest is Test, TestSuiteSetup {
     // CONSTANTS
     //////////////////////////////////////////////////       
 
+    bytes EDDSA_PUB_KEY = 
+        hex"b7a3c12dc0c8c748ab07525b701122b88bd78f600c76342d27f25e5f92444cde";
+
     //////////////////////////////////////////////////
     // STORAGE
     //////////////////////////////////////////////////   
@@ -266,7 +269,54 @@ contract KeyRegistryTest is Test, TestSuiteSetup {
     *
     */            
 
+    // function _prepareAddKeyEoaSigForSmartWallet(CoinbaseSmartWallet _smartWallet, Account memory eoaOwner, uint256 deadline) public view returns (bytes memory) {
+    //     // bytes32 idRegistryRegisterForHash = idRegistry.hashTypedDataV4(
+    //     //     keccak256(abi.encode(idRegistry.REGISTER_TYPEHASH(), address(_smartWallet), recovery, idRegistry.nonces(address(_smartWallet)), deadline))
+    //     // );        
 
+    //     // set up signed key request validator metadata signature
+
+
+    //     bytes32 idRegistryRegisterForHash = idRegistry.hashTypedDataV4(
+    //         keccak256(abi.encode(idRegistry.REGISTER_TYPEHASH(), address(_smartWallet), recovery, idRegistry.nonces(address(_smartWallet)), deadline))
+    //     );        
+    //     bytes32 smartWalletSafeHash = _smartWallet.replaySafeHash(idRegistryRegisterForHash);
+    //     bytes memory eoaSig = _sign(eoaOwner.key, smartWalletSafeHash);
+    //     SignatureWrapper memory wrapper = SignatureWrapper({ownerIndex: 0, signatureData: eoaSig});
+    //     bytes memory encodedWrapper = abi.encode(wrapper);
+
+
+
+    //     SignedKeyRequestValidator.SignedKeyRequestMetadata memory metadata = SignedKeyRequestValidator({
+    //         requestRid: 1,
+    //         requestSigner: address(_smartWallet),
+    //         signature: ,
+    //         deadline: deadline
+    //     })
+
+    //     // set up key registry signature
+
+
+    //     bytes32 keyRegistryAddForHash = keyRegistry.hashTypedDataV4(
+    //         keccak256(abi.encode(
+    //             keyRegistry.ADD_TYPEHASH(), // typehash
+    //             address(_smartWallet),      // rid woner
+    //             1,                          // key type
+    //             keccak256(EDDSA_PUB_KEY),   // key hash
+    //             1,                          // key metadata type
+    //             idRegistry.nonces(address(_smartWallet)), 
+    //             deadline
+    //         )
+    //     )
+    //     );                
+
+
+    //     bytes32 smartWalletSafeHash = _smartWallet.replaySafeHash(idRegistryRegisterForHash);
+    //     bytes memory eoaSig = _sign(eoaOwner.key, smartWalletSafeHash);
+    //     SignatureWrapper memory wrapper = SignatureWrapper({ownerIndex: 0, signatureData: eoaSig});
+    //     bytes memory encodedWrapper = abi.encode(wrapper);
+    //     return encodedWrapper;                
+    // }     
 
 
 }
