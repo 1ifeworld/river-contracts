@@ -19,6 +19,8 @@ abstract contract TestSuiteSetup is Test {
     }    
 
     uint256 constant SECP_256K1_ORDER = 0xfffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141;
+    bytes32 public ERC6492_DETECTION_SUFFIX = 0x6492649264926492649264926492649264926492649264926492649264926492;
+    bytes4 public ERC1271_SUCCESS = 0x1626ba7e;    
 
     Account public trusted = makeAccount("trusted");
     Account public recovery = makeAccount("recovery");

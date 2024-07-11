@@ -20,9 +20,6 @@ contract SmartWalletTest is Test, TestSuiteSetup {
     uint256 nonce;
     uint256 passkeyOwnerIndex;
 
-    bytes32 public ERC6492_DETECTION_SUFFIX = 0x6492649264926492649264926492649264926492649264926492649264926492;
-    bytes4 public ERC1271_SUCCESS = 0x1626ba7e;
-
     function setUp() public virtual {
         // setup fork
         uint256 baseSepoliaFork = vm.createFork('https://sepolia.base.org');
