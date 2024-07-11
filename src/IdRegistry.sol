@@ -19,9 +19,10 @@ contract IdRegistry is IIdRegistry, Trust, Pausable, Signatures, EIP712, Nonces 
     // CONSTANTS
     ////////////////////////////////////////////////////////////////
 
-    string public constant NAME = "River Id";
+    string public constant NAME = "River Id Registry";
 
-    string public constant VERSION = "2024.02.05";
+    // TODO: update
+    string public constant VERSION = "2024.07.11";
 
     bytes32 public constant REGISTER_TYPEHASH =
         keccak256("Register(address to,address recovery,uint256 nonce,uint256 deadline)");          
