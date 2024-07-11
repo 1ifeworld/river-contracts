@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.23;
 
-import {SignatureChecker} from "@openzeppelin/utils/cryptography/SignatureChecker.sol";
 import {Pausable} from "@openzeppelin/utils/Pausable.sol";
 import {IIdRegistry} from "./interfaces/IIdRegistry.sol";
 import {Signatures} from "./abstract/Signatures.sol";
@@ -83,7 +82,7 @@ contract IdRegistry is IIdRegistry, Trust, Pausable, Signatures, EIP712, Nonces 
     /**
      * @dev Will revert if msg.sender is not a trusted caller
      */
-    function _register(address to, address recovery) internal trust returns (uint256 rid) {
+    function _register(address to, address recovery) internal trusted returns (uint256 rid) {
         rid = _unsafeRegister(to, recovery);
         emit Register(to, idCounter, recovery);
     }

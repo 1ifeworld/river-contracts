@@ -18,9 +18,15 @@ contract IdRegistryScript is Script {
         VmSafe.Wallet memory deployerWallet = vm.createWallet(deployerPrivateKey);
 
         vm.startBroadcast(deployerPrivateKey);
+
+        // setup trusted caller variables
+        address[] memory trustedCallers = new address[](1);
+        trustedCallers[0] = firstTrustedCaller;
+        bool[] memory statuses = new bool[](1);
+        statuses[0] = true;
         
         idRegistry = new IdRegistry(deployerWallet.addr);  
-        idRegistry.setTrustedCaller(firstTrustedCaller);
+        idRegistry.setTrustedCallers(trustedCallers, statuses);
 
         vm.stopBroadcast();
     }

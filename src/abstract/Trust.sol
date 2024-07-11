@@ -9,6 +9,9 @@ abstract contract Trust is Ownable2Step {
                                  ERRORS
     //////////////////////////////////////////////////////////////*/
 
+    /// @dev Revert on array length mismatch
+    error Input_Length_Mismatch();
+
     /// @dev Revert when an unauthorized caller calls a trusted function.
     error Only_Trusted();
 
@@ -22,11 +25,11 @@ abstract contract Trust is Ownable2Step {
     /**
      * @dev Emit an event when the trusted caller is modified.
      *
-     * @param oldCaller The address of the old trusted caller.
-     * @param newCaller The address of the new trusted caller.
+     * @param account   The address of target account
+     * @param status    The status of target account
      * @param owner     The address of the owner setting the new caller.
      */
-    event SetTrustedCaller(address indexed oldCaller, address indexed newCaller, address owner);
+    event SetTrustedCaller(address indexed account, bool indexed status, address owner);
 
     /**
      * @dev Emit an event when the trustedOnly state is disabled.
@@ -40,7 +43,7 @@ abstract contract Trust is Ownable2Step {
     /**
      * @dev The privileged address that is allowed to call trusted functions.
      */
-    address public trustedCaller;
+    mapping(address => bool) isTrustedCaller;
 
     /**
      * @dev Allows calling trusted functions when set 1, and disables trusted
@@ -56,12 +59,15 @@ abstract contract Trust is Ownable2Step {
     /**
      * @dev Allow only the trusted caller to call the modified function.
      */
-    modifier trust() {
+    modifier trusted() {
         if (trustedOnly == 1) {
-            if (msg.sender != trustedCaller) revert Only_Trusted();
+            if (!isTrustedCaller[msg.sender]) revert Only_Trusted();
         }
         _;
     }
+    
+    // TODO:
+    // add a trustedOrOwner modifer?
 
     /*//////////////////////////////////////////////////////////////
                                CONSTRUCTOR
@@ -79,10 +85,11 @@ abstract contract Trust is Ownable2Step {
     /**
      * @notice Change the trusted caller by calling this from the contract's owner.
      *
-     * @param _trustedCaller The address of the new trusted caller
+     * @param accounts Accounts to update trusted caller status
+     * @param statuses Boolean values to update accounts with
      */
-    function setTrustedCaller(address _trustedCaller) public onlyOwner {
-        _setTrustedCaller(_trustedCaller);
+    function setTrustedCallers(address[] memory accounts, bool[] memory statuses) public onlyOwner {
+        _setTrustedCallers(accounts, statuses);
     }
 
     /**
@@ -101,10 +108,13 @@ abstract contract Trust is Ownable2Step {
      * @dev Internal helper to set trusted caller. Can be used internally
      *      to set the trusted caller at construction time.
      */
-    function _setTrustedCaller(address _trustedCaller) internal {
-        if (_trustedCaller == address(0)) revert Invalid_Address();
-
-        emit SetTrustedCaller(trustedCaller, _trustedCaller, msg.sender);
-        trustedCaller = _trustedCaller;
+    function _setTrustedCallers(address[] memory _accounts, bool[] memory _statuses) internal {
+        address sender = msg.sender;
+        if (_accounts.length != _statuses.length) revert Input_Length_Mismatch();
+        for (uint256 i = 0; i < _accounts.length; ++i) {
+            if (_accounts[i] == address(0)) revert Invalid_Address();
+            isTrustedCaller[_accounts[i]] = _statuses[i];
+            emit SetTrustedCaller(_accounts[i], _statuses[i], sender);
+        }
     }
 }

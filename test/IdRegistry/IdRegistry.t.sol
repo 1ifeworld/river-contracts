@@ -47,8 +47,12 @@ contract IdRegistryTest is Test, TestSuiteSetup {
         smartWallet = smartWalletFactory.createAccount(owners, nonce);
         // id registry
         idRegistry = new IdRegistry(trusted.addr);  
+        address[] memory trustedCallers = new address[](1);
+        trustedCallers[0] = trusted.addr;
+        bool[] memory statuses = new bool[](1);
+        statuses[0] = true;        
         vm.prank(trusted.addr);
-        idRegistry.setTrustedCaller(trusted.addr);
+        idRegistry.setTrustedCallers(trustedCallers, statuses);
     }    
 
     //////////////////////////////////////////////////
