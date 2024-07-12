@@ -24,6 +24,7 @@ contract SignedKeyRequestValidatorTest is IdRegistryTestSuite {
     //////////////////////////////////////////////////
 
     bytes EDDSA_PUB_KEY = hex"b7a3c12dc0c8c748ab07525b701122b88bd78f600c76342d27f25e5f92444cde";
+    bytes32 EDDSA_PUB_KEY_HASH = keccak256(EDDSA_PUB_KEY);
     SignedKeyRequestValidator public validator;
 
     //////////////////////////////////////////////////
@@ -69,17 +70,24 @@ contract SignedKeyRequestValidatorTest is IdRegistryTestSuite {
         uint256 deadline = _deadline();
         // start prank as trusted calle
         vm.startPrank(trusted.addr);
-        // generate registerfor signature
-        bytes memory sig = _signRegister(user.key, user.addr, trusted.addr, deadline);
-        // register id
-        uint256 rid = idRegistry.registerFor(user.addr, trusted.addr, deadline, sig);
-        // get signature for signedKeyRequestBytes
-        bytes memory signedMetadata = _signMetadata(user.key, rid, EDDSA_PUB_KEY, deadline);
-        // format signedKeyRequestBytes
-        bytes memory signedKeyRequestBytes = _formatSignedKeyRequestBytes(rid, user.addr, signedMetadata, deadline);
+        // prepare reigster sig for user
+        bytes memory sig = _prepareEoaSigForSmartWallet(smartWallet, user, recovery.addr, deadline);        
+        // register id to user
+        uint256 rid = idRegistry.registerFor(address(smartWallet), recovery.addr, deadline, sig);        
+        // generate typehash for SignedKeyRequestValidator signature
+        bytes32 validatorMetadataTypeHash = validator.hashTypedDataV4(
+            keccak256(abi.encode(validator.METADATA_TYPEHASH(), rid, EDDSA_PUB_KEY_HASH, deadline))
+        );        
+        // generate safehash and eoa sig to be sent to smart account
+        bytes32 smartWalletSafeHash = smartWallet.replaySafeHash(validatorMetadataTypeHash);
+        bytes memory metadataEoaSig = _sign(user.key, smartWalletSafeHash);
+        SignatureWrapper memory wrapper = SignatureWrapper({ownerIndex: 0, signatureData: metadataEoaSig});
+        bytes memory encodedWrapper = abi.encode(wrapper);        
+        // format signedKeyRequestBytes received by validator
+        bytes memory signedKeyRequestBytes = _formatSignedKeyRequestBytes(rid, address(smartWallet), encodedWrapper, deadline);        
         // call validator
         bool response = validator.validate(0, EDDSA_PUB_KEY, signedKeyRequestBytes);
-        assertEq(response, true);
+        assertEq(response, true);       
     }    
 
     //////////////////////////////////////////////////
