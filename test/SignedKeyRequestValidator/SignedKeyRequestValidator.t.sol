@@ -151,6 +151,8 @@ contract SignedKeyRequestValidatorTest is IdRegistryTestSuite {
         return abi.encode(metadata);
     }
 
+    /* EOA STUFF */
+
     function _prepValidateEoaSigForSmartWallet(
         Account memory eoaForSmartWallet,
         CoinbaseSmartWallet wallet,
@@ -181,7 +183,6 @@ contract SignedKeyRequestValidatorTest is IdRegistryTestSuite {
         bytes32 validatorMetadataTypeHash = validator.hashTypedDataV4(
             keccak256(abi.encode(validator.METADATA_TYPEHASH(), rid, EDDSA_PUB_KEY_HASH, deadline))
         );      
-
         // this creates the hash that will be generated inside of smart account run time
         ERC1271InputGenerator generator = new ERC1271InputGenerator(
             undeployedLocalAcct,
@@ -206,6 +207,8 @@ contract SignedKeyRequestValidatorTest is IdRegistryTestSuite {
             _formatSignedKeyRequestBytes(rid, address(undeployedLocalAcct), sigFor6492, deadline);
         return (address(undeployedLocalAcct), signedKeyRequestBytes);        
     }    
+
+    /* PASSKEY STUFF */
 
     function _prepValidatePasskeySigForSmartWallet(
         CoinbaseSmartWallet wallet,

@@ -238,49 +238,6 @@ contract KeyRegistryTest is Test, SignedKeyRequestValidatorTest {
         return encodedWrapper;
     }
 
-    function _prepareAddForPasskeySigForSmartWallet(
-        CoinbaseSmartWallet _smartWallet,
-        Account memory eoaOwner,
-        bytes memory key,
-        bytes memory metadata,
-        uint256 deadline
-    ) public view returns (bytes memory) {
-        bytes32 keyRegistryAddForTypeHash = keyRegistry.hashTypedDataV4(
-            keccak256(
-                abi.encode(
-                    keyRegistry.ADD_TYPEHASH(),
-                    address(_smartWallet),
-                    1, // key type
-                    keccak256(key),
-                    1, // metadata type
-                    keccak256(metadata),
-                    nonce,
-                    deadline
-                )
-            )
-        );
-        bytes32 smartWalletSafeHash = _smartWallet.replaySafeHash(keyRegistryAddForTypeHash);
-        WebAuthnInfo memory webAuthn = Utils.getWebAuthnStruct(smartWalletSafeHash);
-        (bytes32 r, bytes32 s) = vm.signP256(passkeyPrivateKey, webAuthn.messageHash);
-        s = bytes32(Utils.normalizeS(uint256(s)));
-        bytes memory sig = abi.encode(
-            CoinbaseSmartWallet.SignatureWrapper({
-                ownerIndex: 2,
-                signatureData: abi.encode(
-                    WebAuthn.WebAuthnAuth({
-                        authenticatorData: webAuthn.authenticatorData,
-                        clientDataJSON: webAuthn.clientDataJSON,
-                        typeIndex: 1,
-                        challengeIndex: 23,
-                        r: uint256(r),
-                        s: uint256(s)
-                    })
-                )
-            })
-        );
-        return sig;
-    }
-
     function _prepareAddForEoa6492SigForSmartWallet(
         Account memory _initialSigner,
         bytes[] memory _initialOwners,
@@ -325,6 +282,51 @@ contract KeyRegistryTest is Test, SignedKeyRequestValidatorTest {
             abi.encode(address(smartWalletFactory), accountInitCalldata, encodedWrapper), ERC6492_DETECTION_SUFFIX
         );
         return (address(undeployedLocalAcct), sigFor6492);
+    }    
+
+    /* PASSKEY STUFF */    
+
+    function _prepareAddForPasskeySigForSmartWallet(
+        CoinbaseSmartWallet _smartWallet,
+        Account memory eoaOwner,
+        bytes memory key,
+        bytes memory metadata,
+        uint256 deadline
+    ) public view returns (bytes memory) {
+        bytes32 keyRegistryAddForTypeHash = keyRegistry.hashTypedDataV4(
+            keccak256(
+                abi.encode(
+                    keyRegistry.ADD_TYPEHASH(),
+                    address(_smartWallet),
+                    1, // key type
+                    keccak256(key),
+                    1, // metadata type
+                    keccak256(metadata),
+                    nonce,
+                    deadline
+                )
+            )
+        );
+        bytes32 smartWalletSafeHash = _smartWallet.replaySafeHash(keyRegistryAddForTypeHash);
+        WebAuthnInfo memory webAuthn = Utils.getWebAuthnStruct(smartWalletSafeHash);
+        (bytes32 r, bytes32 s) = vm.signP256(passkeyPrivateKey, webAuthn.messageHash);
+        s = bytes32(Utils.normalizeS(uint256(s)));
+        bytes memory sig = abi.encode(
+            CoinbaseSmartWallet.SignatureWrapper({
+                ownerIndex: 2,
+                signatureData: abi.encode(
+                    WebAuthn.WebAuthnAuth({
+                        authenticatorData: webAuthn.authenticatorData,
+                        clientDataJSON: webAuthn.clientDataJSON,
+                        typeIndex: 1,
+                        challengeIndex: 23,
+                        r: uint256(r),
+                        s: uint256(s)
+                    })
+                )
+            })
+        );
+        return sig;
     }
 
     function _prepareAddForPasskey6492SigForSmartWallet(
