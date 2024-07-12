@@ -2,20 +2,16 @@
 pragma solidity 0.8.23;
 
 import {Test, console2} from "forge-std/Test.sol";
-import "../TestSuiteSetup.sol";
-
+import "@webauthn-sol/test/Utils.sol";
 import {CoinbaseSmartWalletFactory} from "@smart-wallet/CoinbaseSmartWalletFactory.sol";
 import {CoinbaseSmartWallet} from "@smart-wallet/CoinbaseSmartWallet.sol";
-import {IdRegistry} from "../../src/IdRegistry.sol";
-import {IIdRegistry} from "../../src/interfaces/IIdRegistry.sol";
-import {KeyRegistry} from "../../src/KeyRegistry.sol";
-import {IKeyRegistry} from "../../src/interfaces/IKeyRegistry.sol";
-import {SignedKeyRequestValidator} from "../../src/validators/SignedKeyRequestValidator.sol";
-import {IMetadataValidator} from "../../src/interfaces/IMetadataValidator.sol";
-import {ERC1271InputGenerator} from "@smart-wallet/utils/ERC1271InputGenerator.sol";
 import {WebAuthn} from "@webauthn-sol/src/WebAuthn.sol";
-import "@webauthn-sol/test/Utils.sol";
-import "../IdRegistry/IdRegistryTestSuite.sol";
+import {ERC1271InputGenerator} from "@smart-wallet/utils/ERC1271InputGenerator.sol";
+import "../TestSuiteSetup.sol";
+import {IdRegistryTestSuite} from "../IdRegistry/IdRegistryTestSuite.sol";
+import {SignedKeyRequestValidator} from "../../src/validators/SignedKeyRequestValidator.sol";
+// import {KeyRegistry} from "../../src/KeyRegistry.sol";
+// import {IKeyRegistry} from "../../src/interfaces/IKeyRegistry.sol";
 
 contract SignedKeyRequestValidatorTest is IdRegistryTestSuite {
     //////////////////////////////////////////////////
@@ -109,12 +105,6 @@ contract SignedKeyRequestValidatorTest is IdRegistryTestSuite {
         bool response = validator.validate(0, EDDSA_PUB_KEY, signedKeyRequestBytes);
         assertEq(response, true);
     } 
-
-    // function _prepValidatePasskey6492SigForSmartWallet(
-    //     Account memory _initialSigner,        
-    //     bytes[] memory _initialOwners,        
-    //     uint256 rid,
-    //     uint256 deadline    
 
     function test_erc6492_smartWalletCustodyWithPasskeySigner_validate() public {
         // uint256 deadline = _deadline();
@@ -252,10 +242,6 @@ contract SignedKeyRequestValidatorTest is IdRegistryTestSuite {
             _formatSignedKeyRequestBytes(rid, address(wallet), encodedWrapper, deadline);   
         return signedKeyRequestBytes;
     }    
-
-
-
-
 
     function _prepValidatePasskey6492SigForSmartWallet(
         Account memory _initialSigner,        
