@@ -146,22 +146,16 @@ contract KeyRegistryTest is Test, SignedKeyRequestValidatorTest {
         uint256 rid = idRegistry.registerFor(address(undeployedSmartWallet), recovery.addr, _deadline(), sig);
         // use helper to get signedjey request bytes
         (, bytes memory signedKeyRequestBytes) = _prepValidatePasskey6492SigForSmartWallet(user, owners, 1, _deadline());
-
         // generate add for sig
         (, bytes memory addForSig) =
             _prepareAddForPasskey6492SigForSmartWallet(user, owners, EDDSA_PUB_KEY, signedKeyRequestBytes, deadline);
-        // (, bytes memory addForSig) = _prepareAddForEoa6492SigForSmartWallet(user, owners, EDDSA_PUB_KEY, signedKeyRequestBytes, deadline);
-
+        // process add for
         keyRegistry.addFor(address(smartWallet), 1, EDDSA_PUB_KEY, 1, signedKeyRequestBytes, deadline, addForSig);
         // // look up key data of registeedd key
         IKeyRegistry.KeyData memory keyData = keyRegistry.keyDataOf(rid, EDDSA_PUB_KEY);
         // assert key added state is correct
         assertEq(keyData.state == IKeyRegistry.KeyState.ADDED, true);
     }
-
-    // function test_erc6492_smartWalletCustodyWithPasskeySigner_addFor() public {
-
-    // }
 
     //////////////////////////////////////////////////
     // HELPERS
