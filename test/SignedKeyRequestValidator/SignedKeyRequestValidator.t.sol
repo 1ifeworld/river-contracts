@@ -110,6 +110,28 @@ contract SignedKeyRequestValidatorTest is IdRegistryTestSuite {
         assertEq(response, true);
     } 
 
+    // function _prepValidatePasskey6492SigForSmartWallet(
+    //     Account memory _initialSigner,        
+    //     bytes[] memory _initialOwners,        
+    //     uint256 rid,
+    //     uint256 deadline    
+
+    function test_erc6492_smartWalletCustodyWithPasskeySigner_validate() public {
+        // uint256 deadline = _deadline();
+        // start prank as trusted calle
+        vm.startPrank(trusted.addr);
+        // prepare reigster sig for user
+        (address undeployedSmartWallet, bytes memory sig) = _preparePasskey6492SigForSmartWallet(owners, recovery.addr, _deadline());
+        // register id to user
+        idRegistry.registerFor(address(undeployedSmartWallet), recovery.addr, _deadline(), sig);
+        // use helper to get signedjey request bytes
+        // bytes memory signedKeyRequestBytes = _prepValidateEoaSigForSmartWallet(user, undeployedSmartWallet, rid, deadline);
+        (, bytes memory signedKeyRequestBytes) = _prepValidatePasskey6492SigForSmartWallet(user, owners, 1, _deadline());
+        // call validator
+        bool response = validator.validate(0, EDDSA_PUB_KEY, signedKeyRequestBytes);
+        assertEq(response, true);
+    }     
+
     //////////////////////////////////////////////////
     // HELPERS
     //////////////////////////////////////////////////
@@ -230,4 +252,67 @@ contract SignedKeyRequestValidatorTest is IdRegistryTestSuite {
             _formatSignedKeyRequestBytes(rid, address(wallet), encodedWrapper, deadline);   
         return signedKeyRequestBytes;
     }    
+
+
+
+
+
+    function _prepValidatePasskey6492SigForSmartWallet(
+        Account memory _initialSigner,        
+        bytes[] memory _initialOwners,        
+        uint256 rid,
+        uint256 deadline
+    ) internal returns (address, bytes memory) {
+        // this gets deterministic smart account address from factory
+        CoinbaseSmartWallet undeployedLocalAcct =
+            CoinbaseSmartWallet(payable(smartWalletFactory.getAddress(_initialOwners, 0)));
+        // this creates the hash that will be generated inside of smart account run time
+        ERC1271InputGenerator generator = new ERC1271InputGenerator(
+            undeployedLocalAcct,
+            validator.hashTypedDataV4(
+                keccak256(abi.encode(validator.METADATA_TYPEHASH(), rid, EDDSA_PUB_KEY_HASH, deadline))
+            ),      
+            address(smartWalletFactory),
+            abi.encodeWithSignature("createAccount(bytes[],uint256)", _initialOwners, 0)
+        );
+        // NOTE: bytes32(address(generator).code) is the smartWallet replaySafeHash value
+        WebAuthnInfo memory webAuthn = Utils.getWebAuthnStruct(bytes32(address(generator).code));
+        (bytes32 r, bytes32 s) = vm.signP256(passkeyPrivateKey, webAuthn.messageHash);
+        s = bytes32(Utils.normalizeS(uint256(s)));
+        bytes memory encodedWrapper = abi.encode(
+            CoinbaseSmartWallet.SignatureWrapper({
+                ownerIndex: 2,
+                signatureData: abi.encode(
+                    WebAuthn.WebAuthnAuth({
+                        authenticatorData: webAuthn.authenticatorData,
+                        clientDataJSON: webAuthn.clientDataJSON,
+                        typeIndex: 1,
+                        challengeIndex: 23,
+                        r: uint256(r),
+                        s: uint256(s)
+                    })
+                )
+            })
+        );        
+        // this creates the account init data that will be used to simulate deploy of smart account
+        bytes memory accountInitCalldata = abi.encodeCall(
+            CoinbaseSmartWalletFactory.createAccount,
+            (_initialOwners, 0) // owners, nonce
+        );        
+        // this creates the 6492 sig format that can be detected by verifiers suppriting 6492 verification
+        bytes memory sigFor6492 = bytes.concat(
+            abi.encode(
+                address(smartWalletFactory), 
+                abi.encodeCall(
+                    CoinbaseSmartWalletFactory.createAccount,
+                    (_initialOwners, 0) // owners, nonce
+                ),
+                encodedWrapper
+            ),
+            ERC6492_DETECTION_SUFFIX
+        );
+        bytes memory signedKeyRequestBytes =
+            _formatSignedKeyRequestBytes(rid, address(undeployedLocalAcct), sigFor6492, deadline);
+        return (address(undeployedLocalAcct), signedKeyRequestBytes);        
+    }        
 }
