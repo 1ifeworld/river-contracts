@@ -27,6 +27,16 @@ contract SignedKeyRequestValidatorTest is IdRegistryTestSuite {
     SignedKeyRequestValidator public validator;
 
     //////////////////////////////////////////////////
+    // SETUP
+    //////////////////////////////////////////////////
+
+    function setUp() public virtual override {
+        super.setUp();
+        validator = new SignedKeyRequestValidator(address(idRegistry), trusted.addr);
+    }
+
+
+    //////////////////////////////////////////////////
     // INIT TESTS
     //////////////////////////////////////////////////
 
@@ -45,7 +55,7 @@ contract SignedKeyRequestValidatorTest is IdRegistryTestSuite {
         // generate registerfor signature
         bytes memory sig = _signRegister(user.key, user.addr, trusted.addr, deadline);
         // register id
-        uint256 rid = idRegistry.registerFor(user.addr, trusted.addr, _deadline(), sig);
+        uint256 rid = idRegistry.registerFor(user.addr, trusted.addr, deadline, sig);
         // get signature for signedKeyRequestBytes
         bytes memory signedMetadata = _signMetadata(user.key, rid, EDDSA_PUB_KEY, deadline);
         // format signedKeyRequestBytes
@@ -62,7 +72,7 @@ contract SignedKeyRequestValidatorTest is IdRegistryTestSuite {
         // generate registerfor signature
         bytes memory sig = _signRegister(user.key, user.addr, trusted.addr, deadline);
         // register id
-        uint256 rid = idRegistry.registerFor(user.addr, trusted.addr, _deadline(), sig);
+        uint256 rid = idRegistry.registerFor(user.addr, trusted.addr, deadline, sig);
         // get signature for signedKeyRequestBytes
         bytes memory signedMetadata = _signMetadata(user.key, rid, EDDSA_PUB_KEY, deadline);
         // format signedKeyRequestBytes
