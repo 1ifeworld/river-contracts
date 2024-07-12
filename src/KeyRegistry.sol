@@ -96,12 +96,25 @@ contract KeyRegistry is IKeyRegistry, Trust, Pausable, Signatures, EIP712, Nonce
     // REGISTRATION
     ////////////////////////////////////////////////////////////////
 
+    function trustedAddFor(
+        address ridOwner,
+        uint32 keyType,
+        bytes calldata key,
+        uint8 metadataType,
+        bytes calldata metadata,
+        uint256 deadline,
+        bytes calldata sig
+    ) external onlyTrustedCaller {
+        // NOTE: not perform any signature checks for rid recipient
+        _add(_ridOf(ridOwner), keyType, key, metadataType, metadata);
+    }        
+
     function add(
         uint32 keyType,
         bytes calldata key,
         uint8 metadataType,
         bytes calldata metadata
-    ) external whenNotPaused {
+    ) external whenNotTrustedOnly {
         _add(_ridOf(msg.sender), keyType, key, metadataType, metadata);
     }
 
@@ -113,7 +126,7 @@ contract KeyRegistry is IKeyRegistry, Trust, Pausable, Signatures, EIP712, Nonce
         bytes calldata metadata,
         uint256 deadline,
         bytes calldata sig
-    ) external whenNotPaused {
+    ) external whenNotTrustedOnly {
         _verifyAddSig(ridOwner, keyType, key, metadataType, metadata, deadline, sig);
         _add(_ridOf(ridOwner), keyType, key, metadataType, metadata);
     }    
@@ -125,7 +138,7 @@ contract KeyRegistry is IKeyRegistry, Trust, Pausable, Signatures, EIP712, Nonce
         bytes calldata key,
         uint8 metadataType,
         bytes calldata metadata
-    ) internal {
+    ) internal whenNotPaused {
         _add(rid, keyType, key, metadataType, metadata, true);
     }
 
@@ -151,10 +164,10 @@ contract KeyRegistry is IKeyRegistry, Trust, Pausable, Signatures, EIP712, Nonce
         keyData.keyType = keyType;
         emit Add(rid, keyType, key, key, metadataType, metadata);
 
-        if (validate) {
-            bool isValid = validator.validate(rid, key, metadata);
-            if (!isValid) revert InvalidMetadata();
-        }
+        // if (validate) {
+        //     bool isValid = validator.validate(rid, key, metadata);
+        //     if (!isValid) revert InvalidMetadata();
+        // }
     }
 
     ////////////////////////////////////////////////////////////////

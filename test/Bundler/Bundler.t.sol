@@ -30,77 +30,53 @@ contract BundlerTest is BundlerTestSuite {
                                 REGISTER
     //////////////////////////////////////////////////////////////*/
 
-    // function _generateSigners(
-    //     uint256 accountPk,
-    //     address account,
-    //     uint256 deadline,
-    //     uint256 numSigners
-    // ) internal returns (IBundler.SignerParams[] memory) {
-    //     IBundler.SignerParams[] memory signers = new IBundler.SignerParams[](
-    //         numSigners
-    //     );
-    //     uint256 nonce = keyRegistry.nonces(account);
 
-    //     // The duplication below is ugly but necessary to work around a stack too deep error.
-    //     for (uint256 i = 0; i < numSigners; i++) {
-    //         _registerValidator(uint32(i + 1), uint8(i + 1));
-    //         signers[i] = IBundler.SignerParams({
-    //             keyType: uint32(i + 1),
-    //             key: abi.encodePacked("key", keccak256(abi.encode(i))),
-    //             metadataType: uint8(i + 1),
-    //             metadata: abi.encodePacked("metadata", keccak256(abi.encode(i))),
-    //             deadline: deadline,
-    //             sig: _signAdd(
-    //                 accountPk,
-    //                 account,
-    //                 uint32(i + 1),
-    //                 abi.encodePacked("key", keccak256(abi.encode(i))),
-    //                 uint8(i + 1),
-    //                 abi.encodePacked("metadata", keccak256(abi.encode(i))),
-    //                 nonce + i,
-    //                 deadline
-    //                 )
-    //         });
-    //     }
-    //     return signers;
-    // }
+    function test_trustedRegister() public {
+        bytes memory emptySig = new bytes(0);
+        uint256 deadline = _deadline();
 
-    // function testFuzzRegister(
-    //     address caller,
-    //     uint256 accountPk,
-    //     address recovery,
-    //     uint256 storageUnits,
-    //     uint8 _numSigners,
-    //     uint40 _deadline
-    // ) public {
-    function testFuzzRegister(
-        address caller,
-        uint256 accountPk,
-        address recovery,
-        uint256 storageUnits,
-        uint8 _numSigners,
-        uint40 _deadline
-    ) public {
-        uint256 numSigners = bound(_numSigners, 0, 10);
-        accountPk = _boundPk(accountPk);
-        vm.assume(caller != address(bundler)); // the bundle registry cannot call itself
+        IBundler.SignerParams[] memory signers = new IBundler.SignerParams[](1);
+        signers[0] = IBundler.SignerParams({
+            keyType: 1,
+            key: EDDSA_PUB_KEY,
+            metadataType: 1,
+            metadata: bytes("supposed to be signed key request"),
+            deadline: deadline,
+            sig: emptySig // not getting checked in trusted pathway
+        });
 
-        // State: Trusted Registration is disabled in ID registry
         vm.prank(trusted.addr);
-        idRegistry.disableTrustedOnly();
+        bundler.trustedRegister(
+            IBundler.RegistrationParams({to: address(smartWallet), recovery: recovery.addr, deadline: deadline, sig: emptySig}),
+            signers
+        );
 
-        address account = vm.addr(accountPk);
-        uint256 deadline = _boundDeadline(_deadline);
-        bytes memory registerSig = _signRegister(accountPk, account, recovery, deadline);
-
-        // IBundler.SignerParams[] memory signers = _generateSigners(accountPk, account, deadline, numSigners);
-
-        // vm.prank(caller);
-        // bundler.register(
-        //     IBundler.RegistrationParams({to: account, recovery: recovery, deadline: deadline, sig: registerSig}),
-        //     signers
-        // );
-
-        // _assertSuccessfulRegistration(account, recovery);
+        _assertSuccessfulRegistration(address(smartWallet), recovery.addr);
     }
 }
+
+    // /// @notice Data needed to trusted register a signer with the key registry
+    // struct SignerData {
+    //     uint32 keyType;
+    //     bytes key;
+    //     uint8 metadataType;
+    //     bytes metadata;
+    // }
+
+    // /// @notice Data needed to register an rid with signature.
+    // struct RegistrationParams {
+    //     address to;
+    //     address recovery;
+    //     uint256 deadline;
+    //     bytes sig;
+    // }
+
+    // /// @notice Data needed to add a signer with signature.
+    // struct SignerParams {
+    //     uint32 keyType;
+    //     bytes key;
+    //     uint8 metadataType;
+    //     bytes metadata;
+    //     uint256 deadline;
+    //     bytes sig;
+    // }

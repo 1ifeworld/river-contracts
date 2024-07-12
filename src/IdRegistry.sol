@@ -65,7 +65,15 @@ contract IdRegistry is IIdRegistry, Trust, Pausable, Signatures, EIP712, Nonces 
     // REGISTER LOGIC
     ////////////////////////////////////////////////////////////////
 
-    function register(address recovery) external returns (uint256 rid) {
+    function trustedRegisterFor(
+        address to, 
+        address recovery
+    ) external onlyTrustedCaller returns (uint256 rid) {
+        // NOTE: not perform any signature checks for rid recipient
+        return _register(to, recovery);
+    }
+    
+    function register(address recovery) external whenNotTrustedOnly returns (uint256 rid) {
         return _register(msg.sender, recovery);
     }
 
@@ -74,7 +82,7 @@ contract IdRegistry is IIdRegistry, Trust, Pausable, Signatures, EIP712, Nonces 
         address recovery, 
         uint256 deadline, 
         bytes calldata sig
-    ) external returns (uint256 rid) {
+    ) external whenNotTrustedOnly returns (uint256 rid) {
         /* Revert if signature is invalid */
         _verifyRegisterSig({to: to, recovery: recovery, deadline: deadline, sig: sig});
         return _register(to, recovery);
@@ -83,7 +91,7 @@ contract IdRegistry is IIdRegistry, Trust, Pausable, Signatures, EIP712, Nonces 
     /**
      * @dev Will revert if msg.sender is not a trusted caller
      */
-    function _register(address to, address recovery) internal trusted returns (uint256 rid) {
+    function _register(address to, address recovery) internal returns (uint256 rid) {
         rid = _unsafeRegister(to, recovery);
         emit Register(to, idCounter, recovery);
     }

@@ -9,12 +9,24 @@ abstract contract BundlerTestSuite is KeyRegistryTest {
 
     function setUp() public virtual override {
         super.setUp();
-
+        vm.startPrank(trusted.addr);
         // Set up the BundleRegistry
         bundler = new Bundler(
             address(idRegistry),
-            address(keyRegistry)
+            address(keyRegistry),
+            trusted.addr
         );
+        address[] memory trustedAccounts = new address[](1);
+        bool[] memory statuses = new bool[](1);
+        trustedAccounts[0] = trusted.addr;
+        statuses[0] = true;
+        bundler.setTrustedCallers(trustedAccounts, statuses);
+        // set bundler as trusted caller for id + key registry
+        address[] memory bundlerAsAccount = new address[](1);
+        bundlerAsAccount[0] = address(bundler);
+        idRegistry.setTrustedCallers(bundlerAsAccount, statuses);
+        keyRegistry.setTrustedCallers(bundlerAsAccount, statuses);
+        vm.stopPrank();
     }
 
     // Assert that a given fname was correctly registered with id 1 and recovery

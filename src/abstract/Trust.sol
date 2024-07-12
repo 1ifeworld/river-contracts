@@ -12,6 +12,9 @@ abstract contract Trust is Ownable2Step {
     /// @dev Revert on array length mismatch
     error Input_Length_Mismatch();
 
+    /// @dev Revert if public register is invoked before trustedCallerOnly is disabled.
+    error Registratable();
+
     /// @dev Revert when an unauthorized caller calls a trusted function.
     error Only_Trusted();
 
@@ -59,15 +62,20 @@ abstract contract Trust is Ownable2Step {
     /**
      * @dev Allow only the trusted caller to call the modified function.
      */
-    modifier trusted() {
-        if (trustedOnly == 1) {
-            if (!isTrustedCaller[msg.sender]) revert Only_Trusted();
-        }
+    modifier onlyTrustedCaller() {
+        if (!isTrustedCaller[msg.sender]) revert Only_Trusted();
         _;
     }
-    
-    // TODO:
-    // add a trustedOrOwner modifer?
+
+    /**
+     * @dev Allow only the trusted caller to call the modified function.
+     */
+    modifier whenNotTrustedOnly() {
+        if(!isTrustedCaller[msg.sender]) {
+            if (trustedOnly == 1) revert Registratable();
+        }
+        _;
+    }    
 
     /*//////////////////////////////////////////////////////////////
                                CONSTRUCTOR

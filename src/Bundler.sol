@@ -4,12 +4,13 @@ pragma solidity 0.8.23;
 import {IdRegistry} from "./IdRegistry.sol";
 import {KeyRegistry} from "./KeyRegistry.sol";
 import {IBundler} from "./interfaces/IBundler.sol";
+import {Trust} from "./abstract/Trust.sol";
 
 /**
  * @title River Bundler
  * @dev Forked from Farcaster Bundler.sol
  */
-contract Bundler is IBundler {
+contract Bundler is IBundler, Trust {
 
     /*//////////////////////////////////////////////////////////////
                                  ERRORS
@@ -53,13 +54,20 @@ contract Bundler is IBundler {
      *
      * @param _idRegistry      Address of the IdRegistry contract
      * @param _keyRegistry     Address of the KeyRegistry contract
+     * @param _initialOwner     Address of the KeyRegistry contract
      */
     constructor(
         address _idRegistry,
-        address _keyRegistry
-    ) {
+        address _keyRegistry,
+        address _initialOwner
+    ) Trust(_initialOwner) {
         idRegistry = IdRegistry(_idRegistry);
         keyRegistry = KeyRegistry(_keyRegistry);
+        // address[] memory trustedAccounts = new address[](1);
+        // bool[] memory statuses = new bool[](1);
+        // trustedAccounts[0] = _initialOwner;
+        // statuses[0] = true;
+        // // setTrustedCallers(trustedAccounts, statuses);
     }
 
     /**
@@ -70,17 +78,17 @@ contract Bundler is IBundler {
      *                        metadata, deadline, and signature.
      *
      */
-    function register(
+    function trustedRegister(
         RegistrationParams calldata registration,
         SignerParams[] calldata signers
-    ) external payable {
+    ) external payable onlyTrustedCaller {
         uint256 rid =
-            idRegistry.registerFor(registration.to, registration.recovery, registration.deadline, registration.sig);
+            idRegistry.trustedRegisterFor(registration.to, registration.recovery);
 
         uint256 signersLen = signers.length;
         for (uint256 i; i < signersLen;) {
             SignerParams calldata signer = signers[i];
-            keyRegistry.addFor(
+            keyRegistry.trustedAddFor(
                 registration.to,
                 signer.keyType,
                 signer.key,

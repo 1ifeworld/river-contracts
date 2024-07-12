@@ -52,7 +52,7 @@ interface IBundler {
      * @param signers      Array of structs containing signer parameters: keyType, key, metadataType, metadata, deadline, and signature.
      *
      */
-    function register(
+    function trustedRegister(
         RegistrationParams calldata registration,
         SignerParams[] calldata signers
     ) external payable;
