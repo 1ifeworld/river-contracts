@@ -5,6 +5,7 @@ import "forge-std/Script.sol";
 
 import {IdRegistry} from "../src/IdRegistry.sol";
 import {KeyRegistry} from "../src/KeyRegistry.sol";
+import {Bundler} from "../src/Bundler.sol";
 import {SignedKeyRequestValidator} from "../src/validators/SignedKeyRequestValidator.sol";
 import {IMetadataValidator} from "../src/interfaces/IMetadataValidator.sol";
 
@@ -13,8 +14,8 @@ contract CombinedScript is Script {
     IdRegistry public idRegistry;    
     KeyRegistry public keyRegistry;    
     SignedKeyRequestValidator public validator;    
-    address public firstTrustedCaller = 0x2167dcea5210A0744A4718Ea4C56c042a2f84269;
-    address public secondTrustedCaller = 0x10826C01a27B5E655853d2C54078935DDB374e32;
+    Bundler public bundler;    
+    address public syndicateEoa = 0x10826C01a27B5E655853d2C54078935DDB374e32;
     
     function setUp() public {}
 
@@ -24,22 +25,27 @@ contract CombinedScript is Script {
         VmSafe.Wallet memory deployerWallet = vm.createWallet(deployerPrivateKey);
 
         vm.startBroadcast(deployerPrivateKey);
-
-        // setup trusted caller variables
-        address[] memory trustedCallers = new address[](2);
-        trustedCallers[0] = firstTrustedCaller;
-        trustedCallers[1] = secondTrustedCaller;
-        bool[] memory statuses = new bool[](2);
-        statuses[0] = true;
-        statuses[1] = true;
         
-        
+        // deploy id validator
         idRegistry = new IdRegistry(deployerWallet.addr);  
-        idRegistry.setTrustedCallers(trustedCallers, statuses);
         validator = new SignedKeyRequestValidator(address(idRegistry), deployerWallet.addr);
         keyRegistry = new KeyRegistry(address(idRegistry), deployerWallet.addr, 500);
-        keyRegistry.setTrustedCallers(trustedCallers, statuses);
-        keyRegistry.setValidator(1, 1, IMetadataValidator(validator));
+        bundler = new Bundler(address(idRegistry), address(keyRegistry), deployerWallet.addr);
+
+        address[] memory trustedCallersForBundler = new address[](2);
+        address[] memory bundlerAsTrustedCaller = new address[](1);
+        trustedCallersForBundler[0] = deployerWallet.addr;
+        trustedCallersForBundler[1] = syndicateEoa;
+        bundlerAsTrustedCaller[0] = address(bundler);
+        bool[] memory statusesForBundler = new bool[](2);
+        bool[] memory statusesForIdAndKey = new bool[](1);
+        statusesForBundler[0] = true;
+        statusesForBundler[1] = true;
+        statusesForIdAndKey[0] = true;
+
+        bundler.setTrustedCallers(trustedCallersForBundler, statusesForBundler);
+        idRegistry.setTrustedCallers(bundlerAsTrustedCaller, statusesForIdAndKey);
+        keyRegistry.setTrustedCallers(bundlerAsTrustedCaller, statusesForIdAndKey);
 
         vm.stopBroadcast();
     }

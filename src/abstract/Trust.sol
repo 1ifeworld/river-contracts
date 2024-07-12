@@ -46,7 +46,7 @@ abstract contract Trust is Ownable2Step {
     /**
      * @dev The privileged address that is allowed to call trusted functions.
      */
-    mapping(address => bool) isTrustedCaller;
+    mapping(address => bool) public isTrustedCaller;
 
     /**
      * @dev Allows calling trusted functions when set 1, and disables trusted

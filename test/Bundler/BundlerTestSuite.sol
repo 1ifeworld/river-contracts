@@ -26,6 +26,7 @@ abstract contract BundlerTestSuite is KeyRegistryTest {
         bundlerAsAccount[0] = address(bundler);
         idRegistry.setTrustedCallers(bundlerAsAccount, statuses);
         keyRegistry.setTrustedCallers(bundlerAsAccount, statuses);
+        // dont have keyREigstry.setValidators enabled since commented out that functionality
         vm.stopPrank();
     }
 

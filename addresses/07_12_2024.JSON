@@ -1,0 +1,8 @@
+{
+    "84532": {
+        "IdRegistry": "0x2601197940E714CA54C22832177f3CBda128248d",
+        "KeyRegistry": "0xbc7e9A9a2b1Ff7fbB4700a2D48C51D700aC5cA85",
+        "SignedKeyRequestValidator": "0x1956eAdF45a1eAd5D32dffe607d897208Bc66082",
+        "Bundler": "0x26aaC55bd319b7236f1cf5F7cBC8546f108Fe934"
+    }
+}
