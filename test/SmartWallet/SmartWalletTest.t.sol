@@ -12,38 +12,28 @@ import {SignatureChecker} from "@openzeppelin/utils/cryptography/SignatureChecke
 import "../TestSuiteSetup.sol";
 import {Mock6492Verifier} from "../Mocks/Mock6492Verifier.sol";
 
-contract SmartWalletTest is Test, TestSuiteSetup {
-    Mock6492Verifier verifier;
-    CoinbaseSmartWalletFactory factory;
-    bytes[] owners;
-    CoinbaseSmartWallet account;
-    uint256 nonce;
-    uint256 passkeyOwnerIndex;
+contract SmartWalletTest is TestSuiteSetup {
 
-    function setUp() public virtual {
-        // setup fork
-        uint256 baseSepoliaFork = vm.createFork('https://sepolia.base.org');
-        vm.selectFork(baseSepoliaFork);
-        factory = CoinbaseSmartWalletFactory(0x0BA5ED0c6AA8c49038F819E587E2633c4A9F428a);
-        // setup variables
-        nonce = 0;
-        owners.push(abi.encode(user.addr));
-        owners.push(abi.encode(trusted.addr));
-        owners.push(passkeyOwner);
-        passkeyOwnerIndex = 2;
+    // VARIABLES
+    
+    Mock6492Verifier verifier;
+
+    // SETUP
+
+    function setUp() public virtual override {
+        super.setUp();
         verifier = new Mock6492Verifier();
-        account = factory.createAccount(owners, nonce);
     }
 
     function test_deployFromFactoryEoaOwner() public view {
-        assertEq(address(account), factory.getAddress(owners, nonce));
-        bytes memory owner = account.ownerAtIndex(0);
+        assertEq(address(smartWallet), smartWalletFactory.getAddress(owners, nonce));
+        bytes memory owner = smartWallet.ownerAtIndex(0);
         assertEq(user.addr, abi.decode(owner, (address)));
     }
 
     function test_verifySmartAccountEoa712Sig() public view {
         (bytes32 hash, bytes memory encodedWrapper) = _prepareEoa712Sig(user);
-        bytes4 returnBytes = account.isValidSignature(hash, encodedWrapper);
+        bytes4 returnBytes = smartWallet.isValidSignature(hash, encodedWrapper);
         assertEq(returnBytes, ERC1271_SUCCESS);
     }
 
@@ -57,14 +47,14 @@ contract SmartWalletTest is Test, TestSuiteSetup {
     }
 
     function test_deployFromFactoryPasskeyOwner() public view {
-        assertEq(address(account), factory.getAddress(owners, nonce));
-        bytes memory owner = account.ownerAtIndex(2);
+        assertEq(address(smartWallet), smartWalletFactory.getAddress(owners, nonce));
+        bytes memory owner = smartWallet.ownerAtIndex(2);
         assertEq(passkeyOwner, owner);
     }
 
     function test_verifySmartAccountP256Sig() public view {
         (bytes32 digest, bytes memory sig) = _prepareP256Sig();
-        bytes4 ret = account.isValidSignature(digest, sig);
+        bytes4 ret = smartWallet.isValidSignature(digest, sig);
         assertEq(ret, bytes4(0x1626ba7e));
     }
 
@@ -86,13 +76,13 @@ contract SmartWalletTest is Test, TestSuiteSetup {
         );
         // this gets deterministic smart account address from factory
         CoinbaseSmartWallet undeployedLocalAcct =
-            CoinbaseSmartWallet(payable(factory.getAddress(_initialOwners, 0)));
+            CoinbaseSmartWallet(payable(smartWalletFactory.getAddress(_initialOwners, 0)));
         // this sets the contract code of generator = to the replaySafeHash of the undeployedLocalAcct
         //      if it was deployed. convert to bytes32 by doing bytes32(address(generator).code))
         ERC1271InputGenerator generator = new ERC1271InputGenerator(
             undeployedLocalAcct,
             digest,
-            address(factory),
+            address(smartWalletFactory),
             abi.encodeWithSignature("createAccount(bytes[],uint256)", _initialOwners, 0)
         );
         // this signs the safeReplayHash generated for the undeployed smart account by the
@@ -101,7 +91,7 @@ contract SmartWalletTest is Test, TestSuiteSetup {
         bytes memory encodedSignatureWrapper =
             abi.encode(SignatureWrapper({ownerIndex: 0, signatureData: eoaSigForOwner}));
         bytes memory sigFor6492 = bytes.concat(
-            abi.encode(address(factory), accountInitCalldata, encodedSignatureWrapper),
+            abi.encode(address(smartWalletFactory), accountInitCalldata, encodedSignatureWrapper),
             ERC6492_DETECTION_SUFFIX
         );
         return (address(undeployedLocalAcct), digest, sigFor6492);
@@ -116,7 +106,7 @@ contract SmartWalletTest is Test, TestSuiteSetup {
         //       we are just accessing replaySafeHash from it
         // TODO: cleaner version of test would let us access replaySafeHash from a library or
         //       separately set function
-        bytes32 toSign = account.replaySafeHash(digest);
+        bytes32 toSign = smartWallet.replaySafeHash(digest);
         bytes memory eoaSigForOwner = _sign(eoaOwner.key, toSign);
         SignatureWrapper memory wrapper = SignatureWrapper({ownerIndex: 0, signatureData: eoaSigForOwner});
         bytes memory encodedWrapper = abi.encode(wrapper);
@@ -125,7 +115,7 @@ contract SmartWalletTest is Test, TestSuiteSetup {
 
     function _prepareP256Sig() public view returns (bytes32, bytes memory) {
         bytes32 digest = keccak256("mock p256 hash");
-        bytes32 toSign = account.replaySafeHash(digest);
+        bytes32 toSign = smartWallet.replaySafeHash(digest);
         WebAuthnInfo memory webAuthn = Utils.getWebAuthnStruct(toSign);
         (bytes32 r, bytes32 s) = vm.signP256(passkeyPrivateKey, webAuthn.messageHash);
         s = bytes32(Utils.normalizeS(uint256(s)));
@@ -155,11 +145,11 @@ contract SmartWalletTest is Test, TestSuiteSetup {
             CoinbaseSmartWalletFactory.createAccount,
             (_intialOwners, 0) // owners, nonce
         );
-        CoinbaseSmartWallet undeployedLocalAcct = CoinbaseSmartWallet(payable(factory.getAddress(owners, 0)));
+        CoinbaseSmartWallet undeployedLocalAcct = CoinbaseSmartWallet(payable(smartWalletFactory.getAddress(owners, 0)));
         ERC1271InputGenerator generator = new ERC1271InputGenerator(
             undeployedLocalAcct,
             digest,
-            address(factory),
+            address(smartWalletFactory),
             abi.encodeWithSignature("createAccount(bytes[],uint256)", owners, 0)
         );
         WebAuthnInfo memory webAuthn = Utils.getWebAuthnStruct(bytes32(address(generator).code));
@@ -183,7 +173,7 @@ contract SmartWalletTest is Test, TestSuiteSetup {
         );
 
         bytes memory sigFor6492 = bytes.concat(
-            abi.encode(address(factory), accountInitCalldata, encodedSignatureWrapper),
+            abi.encode(address(smartWalletFactory), accountInitCalldata, encodedSignatureWrapper),
             ERC6492_DETECTION_SUFFIX
         );
         return (address(undeployedLocalAcct), digest, sigFor6492);
