@@ -5,9 +5,7 @@ import {ERC1271} from "solady/accounts/ERC1271.sol";
 import {console} from "forge-std/Test.sol";
 
 /*
- copy paste in implementation from here https://medium.com/@adeolasola01/erc-6942-signature-validation-for-pre-deploy-contracts-78724cdd6c33
-
-as needed, adjust the bytes parsing to match up with the coinbase smart account implementation
+    Implementation from: https://medium.com/@adeolasola01/erc-6942-signature-validation-for-pre-deploy-contracts-78724cdd6c33
 */
 
 error ERC1271Revert(bytes error);

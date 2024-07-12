@@ -10,8 +10,6 @@ import {ERC1271InputGenerator} from "@smart-wallet/utils/ERC1271InputGenerator.s
 import "../TestSuiteSetup.sol";
 import {IdRegistryTestSuite} from "../IdRegistry/IdRegistryTestSuite.sol";
 import {SignedKeyRequestValidator} from "../../src/validators/SignedKeyRequestValidator.sol";
-// import {KeyRegistry} from "../../src/KeyRegistry.sol";
-// import {IKeyRegistry} from "../../src/interfaces/IKeyRegistry.sol";
 
 contract SignedKeyRequestValidatorTest is IdRegistryTestSuite {
     //////////////////////////////////////////////////
