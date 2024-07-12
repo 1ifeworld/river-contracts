@@ -80,7 +80,7 @@ contract SignedKeyRequestValidatorTest is IdRegistryTestSuite {
         // start prank as trusted calle
         vm.startPrank(trusted.addr);
         // prepare reigster sig for user
-        bytes memory sig = _prepareEoaSigForSmartWallet(smartWallet, user, recovery.addr, deadline);
+        bytes memory sig = _preparePasskeySigForSmartWallet(smartWallet, recovery.addr, deadline);
         // register id to user
         uint256 rid = idRegistry.registerFor(address(smartWallet), recovery.addr, deadline, sig);
         // use helper to get signedjey request bytes
@@ -99,7 +99,6 @@ contract SignedKeyRequestValidatorTest is IdRegistryTestSuite {
         // register id to user
         uint256 rid = idRegistry.registerFor(address(undeployedSmartWallet), recovery.addr, deadline, sig);
         // use helper to get signedjey request bytes
-        // bytes memory signedKeyRequestBytes = _prepValidateEoaSigForSmartWallet(user, undeployedSmartWallet, rid, deadline);
         (, bytes memory signedKeyRequestBytes) = _prepValidateEoa6492SigForSmartWallet(user, owners, rid, deadline);
         // call validator
         bool response = validator.validate(0, EDDSA_PUB_KEY, signedKeyRequestBytes);
@@ -115,7 +114,6 @@ contract SignedKeyRequestValidatorTest is IdRegistryTestSuite {
         // register id to user
         idRegistry.registerFor(address(undeployedSmartWallet), recovery.addr, _deadline(), sig);
         // use helper to get signedjey request bytes
-        // bytes memory signedKeyRequestBytes = _prepValidateEoaSigForSmartWallet(user, undeployedSmartWallet, rid, deadline);
         (, bytes memory signedKeyRequestBytes) = _prepValidatePasskey6492SigForSmartWallet(user, owners, 1, _deadline());
         // call validator
         bool response = validator.validate(0, EDDSA_PUB_KEY, signedKeyRequestBytes);

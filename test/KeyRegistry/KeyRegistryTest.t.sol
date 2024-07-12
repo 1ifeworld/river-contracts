@@ -15,42 +15,40 @@ import {IMetadataValidator} from "../../src/interfaces/IMetadataValidator.sol";
 import {ERC1271InputGenerator} from "@smart-wallet/utils/ERC1271InputGenerator.sol";
 import {WebAuthn} from "@webauthn-sol/src/WebAuthn.sol";
 import "@webauthn-sol/test/Utils.sol";
-
 import "../SignedKeyRequestValidator/SignedKeyRequestValidator.t.sol";
 
-contract KeyRegistryTest is Test, SignedKeyRequestValidatorTest {       
-
+contract KeyRegistryTest is Test, SignedKeyRequestValidatorTest {
     //////////////////////////////////////////////////
     // STORAGE
-    //////////////////////////////////////////////////   
+    //////////////////////////////////////////////////
 
     KeyRegistry public keyRegistry;
 
     //////////////////////////////////////////////////
     // SETUP
-    //////////////////////////////////////////////////   
+    //////////////////////////////////////////////////
 
     // Set-up called before each test
-    function setUp() public virtual override {   
+    function setUp() public virtual override {
         super.setUp();
         vm.startPrank(trusted.addr);
-        keyRegistry = new KeyRegistry(address(idRegistry), trusted.addr, 500);        
+        keyRegistry = new KeyRegistry(address(idRegistry), trusted.addr, 500);
         keyRegistry.setTrustedCallers(trustedCallers, statuses);
         keyRegistry.setValidator(1, 1, IMetadataValidator(validator));
-        vm.stopPrank();    
-    }    
+        vm.stopPrank();
+    }
 
     //////////////////////////////////////////////////
     // SETUP TESTS
-    //////////////////////////////////////////////////        
+    //////////////////////////////////////////////////
 
     function testInitialIdRegistry() public {
         assertEq(address(keyRegistry.idRegistry()), address(idRegistry));
-    }    
+    }
 
     //////////////////////////////////////////////////
     // SIGNATURE BASED WRITES
-    //////////////////////////////////////////////////   
+    //////////////////////////////////////////////////
 
     function test_eoaCustodyAddress_addFor() public {
         uint256 deadline = _deadline();
@@ -65,15 +63,7 @@ contract KeyRegistryTest is Test, SignedKeyRequestValidatorTest {
         // format signedKeyRequestBytes
         bytes memory signedKeyRequestBytes = _formatSignedKeyRequestBytes(rid, user.addr, signedMetadata, deadline);
         // generate addFor signature
-        bytes memory addForSig = _signAdd(
-            user.key,
-            user.addr,
-            1,
-            EDDSA_PUB_KEY,
-            1,
-            signedKeyRequestBytes,
-            deadline
-        );
+        bytes memory addForSig = _signAdd(user.key, user.addr, 1, EDDSA_PUB_KEY, 1, signedKeyRequestBytes, deadline);
         // register key
         keyRegistry.addFor(user.addr, 1, EDDSA_PUB_KEY, 1, signedKeyRequestBytes, deadline, addForSig);
         // look up key data of registeedd key
@@ -93,36 +83,95 @@ contract KeyRegistryTest is Test, SignedKeyRequestValidatorTest {
         // use helper to get signedjey request bytes
         bytes memory signedKeyRequestBytes = _prepValidateEoaSigForSmartWallet(user, smartWallet, rid, deadline);
         // generate add for sig
-        bytes memory addForSig = _prepareAddForEoaSigForSmartWallet(smartWallet, user, EDDSA_PUB_KEY, signedKeyRequestBytes, deadline);
+        bytes memory addForSig =
+            _prepareAddForEoaSigForSmartWallet(smartWallet, user, EDDSA_PUB_KEY, signedKeyRequestBytes, deadline);
         // add key
         keyRegistry.addFor(address(smartWallet), 1, EDDSA_PUB_KEY, 1, signedKeyRequestBytes, deadline, addForSig);
         // // look up key data of registeedd key
         IKeyRegistry.KeyData memory keyData = keyRegistry.keyDataOf(rid, EDDSA_PUB_KEY);
         // assert key added state is correct
-        assertEq(keyData.state == IKeyRegistry.KeyState.ADDED, true);        
-    }    
+        assertEq(keyData.state == IKeyRegistry.KeyState.ADDED, true);
+    }
 
-    // function test_smartWalletCustodyWithPasskeySigner_addFor() public {
+    function test_smartWalletCustodyWithPasskeySigner_addFor() public {
+        uint256 deadline = _deadline();
+        // start prank as trusted calle
+        vm.startPrank(trusted.addr);
+        // prepare reigster sig for user
+        bytes memory sig = _preparePasskeySigForSmartWallet(smartWallet, recovery.addr, deadline);
+        // register id to user
+        uint256 rid = idRegistry.registerFor(address(smartWallet), recovery.addr, deadline, sig);
+        // use helper to get signedjey request bytes
+        bytes memory signedKeyRequestBytes = _prepValidatePasskeySigForSmartWallet(smartWallet, rid, deadline);
+        // generate add for sig
+        bytes memory addForSig =
+            _prepareAddForPasskeySigForSmartWallet(smartWallet, user, EDDSA_PUB_KEY, signedKeyRequestBytes, deadline);
+        // add key
+        keyRegistry.addFor(address(smartWallet), 1, EDDSA_PUB_KEY, 1, signedKeyRequestBytes, deadline, addForSig);
+        // // look up key data of registeedd key
+        IKeyRegistry.KeyData memory keyData = keyRegistry.keyDataOf(rid, EDDSA_PUB_KEY);
+        // assert key added state is correct
+        assertEq(keyData.state == IKeyRegistry.KeyState.ADDED, true);
+    }
 
-    // }    
+    function test_erc6492_smartWalletCustodyWithEoaSigner_addFor() public {
+        uint256 deadline = _deadline();
+        // start prank as trusted calle
+        vm.startPrank(trusted.addr);
+        // prepare reigster sig for user
+        (address undeployedSmartWallet, bytes memory sig) =
+            _prepareEoa6492SigForSmartWallet(user, owners, recovery.addr, deadline);
+        // register id to user
+        uint256 rid = idRegistry.registerFor(address(undeployedSmartWallet), recovery.addr, deadline, sig);
+        // use helper to get signedjey request bytes
+        (, bytes memory signedKeyRequestBytes) = _prepValidateEoa6492SigForSmartWallet(user, owners, rid, deadline);
+        // generate add for sig
+        (, bytes memory addForSig) =
+            _prepareAddForEoa6492SigForSmartWallet(user, owners, EDDSA_PUB_KEY, signedKeyRequestBytes, deadline);
+        keyRegistry.addFor(address(smartWallet), 1, EDDSA_PUB_KEY, 1, signedKeyRequestBytes, deadline, addForSig);
+        // // look up key data of registeedd key
+        IKeyRegistry.KeyData memory keyData = keyRegistry.keyDataOf(rid, EDDSA_PUB_KEY);
+        // assert key added state is correct
+        assertEq(keyData.state == IKeyRegistry.KeyState.ADDED, true);
+    }
 
-    // function test_erc6492_smartWalletCustodyWithEoaSigner_addFor() public {
+    function test_erc6492_smartWalletCustodyWithPasskeySigner_addFor() public {
+        uint256 deadline = _deadline();
+        // start prank as trusted calle
+        vm.startPrank(trusted.addr);
+        // prepare reigster sig for user
+        (address undeployedSmartWallet, bytes memory sig) =
+            _preparePasskey6492SigForSmartWallet(owners, recovery.addr, _deadline());
+        // register id to user
+        uint256 rid = idRegistry.registerFor(address(undeployedSmartWallet), recovery.addr, _deadline(), sig);
+        // use helper to get signedjey request bytes
+        (, bytes memory signedKeyRequestBytes) = _prepValidatePasskey6492SigForSmartWallet(user, owners, 1, _deadline());
 
-    // }          
+        // generate add for sig
+        (, bytes memory addForSig) =
+            _prepareAddForPasskey6492SigForSmartWallet(user, owners, EDDSA_PUB_KEY, signedKeyRequestBytes, deadline);
+        // (, bytes memory addForSig) = _prepareAddForEoa6492SigForSmartWallet(user, owners, EDDSA_PUB_KEY, signedKeyRequestBytes, deadline);
+
+        keyRegistry.addFor(address(smartWallet), 1, EDDSA_PUB_KEY, 1, signedKeyRequestBytes, deadline, addForSig);
+        // // look up key data of registeedd key
+        IKeyRegistry.KeyData memory keyData = keyRegistry.keyDataOf(rid, EDDSA_PUB_KEY);
+        // assert key added state is correct
+        assertEq(keyData.state == IKeyRegistry.KeyState.ADDED, true);
+    }
 
     // function test_erc6492_smartWalletCustodyWithPasskeySigner_addFor() public {
 
-    // }           
+    // }
 
     //////////////////////////////////////////////////
     // HELPERS
-    //////////////////////////////////////////////////       
+    //////////////////////////////////////////////////
 
     /*
     *
     * KEY REGISTRY
     *
-    */        
+    */
 
     /* EOA STUFF */
 
@@ -165,9 +214,15 @@ contract KeyRegistryTest is Test, SignedKeyRequestValidatorTest {
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(pk, digest);
         signature = abi.encodePacked(r, s, v);
         assertEq(signature.length, 65);
-    }    
-    
-    function _prepareAddForEoaSigForSmartWallet(CoinbaseSmartWallet _smartWallet, Account memory eoaOwner, bytes memory key, bytes memory metadata, uint256 deadline) public view returns (bytes memory) {
+    }
+
+    function _prepareAddForEoaSigForSmartWallet(
+        CoinbaseSmartWallet _smartWallet,
+        Account memory eoaOwner,
+        bytes memory key,
+        bytes memory metadata,
+        uint256 deadline
+    ) public view returns (bytes memory) {
         bytes32 keyRegistryAddForTypeHash = keyRegistry.hashTypedDataV4(
             keccak256(
                 abi.encode(
@@ -186,185 +241,157 @@ contract KeyRegistryTest is Test, SignedKeyRequestValidatorTest {
         bytes memory eoaSig = _sign(eoaOwner.key, smartWalletSafeHash);
         SignatureWrapper memory wrapper = SignatureWrapper({ownerIndex: 0, signatureData: eoaSig});
         bytes memory encodedWrapper = abi.encode(wrapper);
-        return encodedWrapper;                
-    }        
+        return encodedWrapper;
+    }
 
+    function _prepareAddForPasskeySigForSmartWallet(
+        CoinbaseSmartWallet _smartWallet,
+        Account memory eoaOwner,
+        bytes memory key,
+        bytes memory metadata,
+        uint256 deadline
+    ) public view returns (bytes memory) {
+        bytes32 keyRegistryAddForTypeHash = keyRegistry.hashTypedDataV4(
+            keccak256(
+                abi.encode(
+                    keyRegistry.ADD_TYPEHASH(),
+                    address(_smartWallet),
+                    1, // key type
+                    keccak256(key),
+                    1, // metadata type
+                    keccak256(metadata),
+                    nonce,
+                    deadline
+                )
+            )
+        );
+        bytes32 smartWalletSafeHash = _smartWallet.replaySafeHash(keyRegistryAddForTypeHash);
+        WebAuthnInfo memory webAuthn = Utils.getWebAuthnStruct(smartWalletSafeHash);
+        (bytes32 r, bytes32 s) = vm.signP256(passkeyPrivateKey, webAuthn.messageHash);
+        s = bytes32(Utils.normalizeS(uint256(s)));
+        bytes memory sig = abi.encode(
+            CoinbaseSmartWallet.SignatureWrapper({
+                ownerIndex: 2,
+                signatureData: abi.encode(
+                    WebAuthn.WebAuthnAuth({
+                        authenticatorData: webAuthn.authenticatorData,
+                        clientDataJSON: webAuthn.clientDataJSON,
+                        typeIndex: 1,
+                        challengeIndex: 23,
+                        r: uint256(r),
+                        s: uint256(s)
+                    })
+                )
+            })
+        );
+        return sig;
+    }
 
-    // function _prepareEoa6492SigForSmartWallet(Account memory _initialSigner, bytes[] memory _initialOwners, address recovery, uint256 deadline)
-    //     public
-    //     returns (address, bytes memory)
-    // {
-    //     // this gets deterministic smart account address from factory
-    //     CoinbaseSmartWallet undeployedLocalAcct =
-    //         CoinbaseSmartWallet(payable(smartWalletFactory.getAddress(_initialOwners, 0)));
+    function _prepareAddForEoa6492SigForSmartWallet(
+        Account memory _initialSigner,
+        bytes[] memory _initialOwners,
+        bytes memory key,
+        bytes memory metadata,
+        uint256 deadline
+    ) internal returns (address, bytes memory) {
+        // this gets deterministic smart account address from factory
+        CoinbaseSmartWallet undeployedLocalAcct =
+            CoinbaseSmartWallet(payable(smartWalletFactory.getAddress(_initialOwners, 0)));
+        bytes32 keyRegistryAddForTypeHash = keyRegistry.hashTypedDataV4(
+            keccak256(
+                abi.encode(
+                    keyRegistry.ADD_TYPEHASH(),
+                    address(undeployedLocalAcct),
+                    1, // key type
+                    keccak256(key),
+                    1, // metadata type
+                    keccak256(metadata),
+                    nonce,
+                    deadline
+                )
+            )
+        );
+        // this creates the hash that will be generated inside of smart account run time
+        ERC1271InputGenerator generator = new ERC1271InputGenerator(
+            undeployedLocalAcct,
+            keyRegistryAddForTypeHash,
+            address(smartWalletFactory),
+            abi.encodeWithSignature("createAccount(bytes[],uint256)", _initialOwners, 0)
+        );
+        bytes32 smartWalletSafeHash = bytes32(address(generator).code);
+        bytes memory addForEoaSig = _sign(_initialSigner.key, smartWalletSafeHash);
+        bytes memory encodedWrapper = abi.encode(SignatureWrapper({ownerIndex: 0, signatureData: addForEoaSig}));
+        // this creates the account init data that will be used to simulate deploy of smart account
+        bytes memory accountInitCalldata = abi.encodeCall(
+            CoinbaseSmartWalletFactory.createAccount,
+            (_initialOwners, 0) // owners, nonce
+        );
+        // this creates the 6492 sig format that can be detected by verifiers suppriting 6492 verification
+        bytes memory sigFor6492 = bytes.concat(
+            abi.encode(address(smartWalletFactory), accountInitCalldata, encodedWrapper), ERC6492_DETECTION_SUFFIX
+        );
+        return (address(undeployedLocalAcct), sigFor6492);
+    }
 
-    //     // this creates the hash that will be generated inside of id registry run time
-    //     bytes32 idRegistryRegisterForHash = idRegistry.hashTypedDataV4(
-    //         keccak256(abi.encode(idRegistry.REGISTER_TYPEHASH(), address(undeployedLocalAcct), recovery, idRegistry.nonces(address(undeployedLocalAcct)), deadline))
-    //     );               
-    //     // this creates the hash that will be generated inside of smart account run time
-    //     ERC1271InputGenerator generator = new ERC1271InputGenerator(
-    //         undeployedLocalAcct,
-    //         idRegistryRegisterForHash,
-    //         address(smartWalletFactory),
-    //         abi.encodeWithSignature("createAccount(bytes[],uint256)", _initialOwners, 0)
-    //     );
-    //     bytes32 smartWalletSafeHash = bytes32(address(generator).code);
-    //     // this creates the signature of the owner of the smart wallet
-    //     bytes memory eoaSigForOwner = _sign(_initialSigner.key, smartWalletSafeHash);
-    //     // this creates the signature wrapper that is used to pass signatures inside of smart wallet runtime
-    //     bytes memory encodedSignatureWrapper =
-    //         abi.encode(SignatureWrapper({ownerIndex: 0, signatureData: eoaSigForOwner}));
-    //     // this creates the account init data that will be used to simulate deploy of smart account
-    //     bytes memory accountInitCalldata = abi.encodeCall(
-    //         CoinbaseSmartWalletFactory.createAccount,
-    //         (_initialOwners, 0) // owners, nonce
-    //     );        
-    //     // this creates the 6492 sig format that can be detected by verifiers suppriting 6492 verification
-    //     bytes memory sigFor6492 = bytes.concat(
-    //         abi.encode(address(smartWalletFactory), accountInitCalldata, encodedSignatureWrapper),
-    //         ERC6492_DETECTION_SUFFIX
-    //     );
-    //     return (address(undeployedLocalAcct), sigFor6492);
-    // }
-
-    // /* PASSKEY STUFF */
-
-    // function _preparePasskeySigForSmartWallet(CoinbaseSmartWallet _smartWallet, Account memory eoaOwner, address recovery, uint256 deadline) public view returns (bytes memory) {
-    //     bytes32 idRegistryRegisterForHash = idRegistry.hashTypedDataV4(
-    //         keccak256(abi.encode(idRegistry.REGISTER_TYPEHASH(), address(_smartWallet), recovery, idRegistry.nonces(address(_smartWallet)), deadline))
-    //     );        
-    //     bytes32 smartWalletSafeHash = _smartWallet.replaySafeHash(idRegistryRegisterForHash);
-    //     WebAuthnInfo memory webAuthn = Utils.getWebAuthnStruct(smartWalletSafeHash);
-    //     (bytes32 r, bytes32 s) = vm.signP256(passkeyPrivateKey, webAuthn.messageHash);
-    //     s = bytes32(Utils.normalizeS(uint256(s)));
-    //     bytes memory sig = abi.encode(
-    //         CoinbaseSmartWallet.SignatureWrapper({
-    //             ownerIndex: 2,
-    //             signatureData: abi.encode(
-    //                 WebAuthn.WebAuthnAuth({
-    //                     authenticatorData: webAuthn.authenticatorData,
-    //                     clientDataJSON: webAuthn.clientDataJSON,
-    //                     typeIndex: 1,
-    //                     challengeIndex: 23,
-    //                     r: uint256(r),
-    //                     s: uint256(s)
-    //                 })
-    //             )
-    //         })
-    //     );
-    //     return sig;                
-    // }        
-
-
-    // function _preparePasskey6492SigForSmartWallet(Account memory _initialSigner, bytes[] memory _initialOwners, address recovery, uint256 deadline)
-    //     public
-    //     returns (address, bytes memory)
-    // {
-    //     // this gets deterministic smart account address from factory
-    //     CoinbaseSmartWallet undeployedLocalAcct =
-    //         CoinbaseSmartWallet(payable(smartWalletFactory.getAddress(_initialOwners, 0)));
-
-    //     // this creates the hash that will be generated inside of id registry run time
-    //     bytes32 idRegistryRegisterForHash = idRegistry.hashTypedDataV4(
-    //         keccak256(abi.encode(idRegistry.REGISTER_TYPEHASH(), address(undeployedLocalAcct), recovery, idRegistry.nonces(address(undeployedLocalAcct)), deadline))
-    //     );               
-    //     // this creates the hash that will be generated inside of smart account run time
-    //     ERC1271InputGenerator generator = new ERC1271InputGenerator(
-    //         undeployedLocalAcct,
-    //         idRegistryRegisterForHash,
-    //         address(smartWalletFactory),
-    //         abi.encodeWithSignature("createAccount(bytes[],uint256)", _initialOwners, 0)
-    //     );
-    //     bytes32 smartWalletSafeHash = bytes32(address(generator).code);
-    //     // formats webauthn
-    //     WebAuthnInfo memory webAuthn = Utils.getWebAuthnStruct(smartWalletSafeHash);
-    //     // creates + cleans p256 sig
-    //     (bytes32 r, bytes32 s) = vm.signP256(passkeyPrivateKey, webAuthn.messageHash);
-    //     s = bytes32(Utils.normalizeS(uint256(s)));        
-    //     // creates encoded signature wrapper
-    //     bytes memory encodedSignatureWrapper = abi.encode(
-    //         CoinbaseSmartWallet.SignatureWrapper({
-    //             ownerIndex: 2,
-    //             signatureData: abi.encode(
-    //                 WebAuthn.WebAuthnAuth({
-    //                     authenticatorData: webAuthn.authenticatorData,
-    //                     clientDataJSON: webAuthn.clientDataJSON,
-    //                     typeIndex: 1,
-    //                     challengeIndex: 23,
-    //                     r: uint256(r),
-    //                     s: uint256(s)
-    //                 })
-    //             )
-    //         })
-    //     );        
-    //     // this creates the account init data that will be used to simulate deploy of smart account
-    //     bytes memory accountInitCalldata = abi.encodeCall(
-    //         CoinbaseSmartWalletFactory.createAccount,
-    //         (_initialOwners, 0) // owners, nonce
-    //     );        
-    //     // this creates the 6492 sig format that can be detected by verifiers suppriting 6492 verification
-    //     bytes memory sigFor6492 = bytes.concat(
-    //         abi.encode(address(smartWalletFactory), accountInitCalldata, encodedSignatureWrapper),
-    //         ERC6492_DETECTION_SUFFIX
-    //     );
-    //     return (address(undeployedLocalAcct), sigFor6492);
-    // }
-
-    // /*
-    // *
-    // * KEY REGISTRY
-    // *
-    // */            
-
-    // // function _prepareAddKeyEoaSigForSmartWallet(CoinbaseSmartWallet _smartWallet, Account memory eoaOwner, uint256 deadline) public view returns (bytes memory) {
-    // //     // bytes32 idRegistryRegisterForHash = idRegistry.hashTypedDataV4(
-    // //     //     keccak256(abi.encode(idRegistry.REGISTER_TYPEHASH(), address(_smartWallet), recovery, idRegistry.nonces(address(_smartWallet)), deadline))
-    // //     // );        
-
-    // //     // set up signed key request validator metadata signature
-
-
-    // //     bytes32 idRegistryRegisterForHash = idRegistry.hashTypedDataV4(
-    // //         keccak256(abi.encode(idRegistry.REGISTER_TYPEHASH(), address(_smartWallet), recovery, idRegistry.nonces(address(_smartWallet)), deadline))
-    // //     );        
-    // //     bytes32 smartWalletSafeHash = _smartWallet.replaySafeHash(idRegistryRegisterForHash);
-    // //     bytes memory eoaSig = _sign(eoaOwner.key, smartWalletSafeHash);
-    // //     SignatureWrapper memory wrapper = SignatureWrapper({ownerIndex: 0, signatureData: eoaSig});
-    // //     bytes memory encodedWrapper = abi.encode(wrapper);
-
-
-
-    // //     SignedKeyRequestValidator.SignedKeyRequestMetadata memory metadata = SignedKeyRequestValidator({
-    // //         requestRid: 1,
-    // //         requestSigner: address(_smartWallet),
-    // //         signature: ,
-    // //         deadline: deadline
-    // //     })
-
-    // //     // set up key registry signature
-
-
-    // //     bytes32 keyRegistryAddForHash = keyRegistry.hashTypedDataV4(
-    // //         keccak256(abi.encode(
-    // //             keyRegistry.ADD_TYPEHASH(), // typehash
-    // //             address(_smartWallet),      // rid woner
-    // //             1,                          // key type
-    // //             keccak256(EDDSA_PUB_KEY),   // key hash
-    // //             1,                          // key metadata type
-    // //             idRegistry.nonces(address(_smartWallet)), 
-    // //             deadline
-    // //         )
-    // //     )
-    // //     );                
-
-
-    // //     bytes32 smartWalletSafeHash = _smartWallet.replaySafeHash(idRegistryRegisterForHash);
-    // //     bytes memory eoaSig = _sign(eoaOwner.key, smartWalletSafeHash);
-    // //     SignatureWrapper memory wrapper = SignatureWrapper({ownerIndex: 0, signatureData: eoaSig});
-    // //     bytes memory encodedWrapper = abi.encode(wrapper);
-    // //     return encodedWrapper;                
-    // // }     
-
-
+    function _prepareAddForPasskey6492SigForSmartWallet(
+        Account memory _initialSigner,
+        bytes[] memory _initialOwners,
+        bytes memory key,
+        bytes memory metadata,
+        uint256 deadline
+    ) internal returns (address, bytes memory) {
+        // this gets deterministic smart account address from factory
+        CoinbaseSmartWallet undeployedLocalAcct =
+            CoinbaseSmartWallet(payable(smartWalletFactory.getAddress(_initialOwners, 0)));
+        bytes32 keyRegistryAddForTypeHash = keyRegistry.hashTypedDataV4(
+            keccak256(
+                abi.encode(
+                    keyRegistry.ADD_TYPEHASH(),
+                    address(undeployedLocalAcct),
+                    1, // key type
+                    keccak256(key),
+                    1, // metadata type
+                    keccak256(metadata),
+                    nonce,
+                    deadline
+                )
+            )
+        );
+        // this creates the hash that will be generated inside of smart account run time
+        ERC1271InputGenerator generator = new ERC1271InputGenerator(
+            undeployedLocalAcct,
+            keyRegistryAddForTypeHash,
+            address(smartWalletFactory),
+            abi.encodeWithSignature("createAccount(bytes[],uint256)", _initialOwners, 0)
+        );
+        bytes32 smartWalletSafeHash = bytes32(address(generator).code);
+        WebAuthnInfo memory webAuthn = Utils.getWebAuthnStruct(smartWalletSafeHash);
+        (bytes32 r, bytes32 s) = vm.signP256(passkeyPrivateKey, webAuthn.messageHash);
+        s = bytes32(Utils.normalizeS(uint256(s)));
+        bytes memory encodedWrapper = abi.encode(
+            CoinbaseSmartWallet.SignatureWrapper({
+                ownerIndex: 2,
+                signatureData: abi.encode(
+                    WebAuthn.WebAuthnAuth({
+                        authenticatorData: webAuthn.authenticatorData,
+                        clientDataJSON: webAuthn.clientDataJSON,
+                        typeIndex: 1,
+                        challengeIndex: 23,
+                        r: uint256(r),
+                        s: uint256(s)
+                    })
+                )
+            })
+        );        
+        // this creates the account init data that will be used to simulate deploy of smart account
+        bytes memory accountInitCalldata = abi.encodeCall(
+            CoinbaseSmartWalletFactory.createAccount,
+            (_initialOwners, 0) // owners, nonce
+        );
+        // this creates the 6492 sig format that can be detected by verifiers suppriting 6492 verification
+        bytes memory sigFor6492 = bytes.concat(
+            abi.encode(address(smartWalletFactory), accountInitCalldata, encodedWrapper), ERC6492_DETECTION_SUFFIX
+        );
+        return (address(undeployedLocalAcct), sigFor6492);
+    }
 }
