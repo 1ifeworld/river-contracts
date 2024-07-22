@@ -115,6 +115,10 @@ contract RiverRegistry is Trust2, Nonces {
     // MIGRATION MANAGEMENT
     ////////////////////////////////////////////////////////////////      
 
+    // TODO: should we add in a "already migrated" storage variable
+    //       that would prevent an rid from being migrated more than once?
+    //       quick answer is yes, but would mean if we mess up we have to redeploy the contract again while prod
+    //       is live :(
     function trustedMigrateFor(uint256 rid, address recipient, KeyRegistration[] memory keys) onlyTrusted external {
         // Revert if targeting an rid after migration cutoff
         if (rid > RID_MIGRATION_CUTOFF) revert Past_Migration_Cutoff();
@@ -190,7 +194,7 @@ contract RiverRegistry is Trust2, Nonces {
         keyData.state = KeyState.ADDED;
         keyData.keyType = keyType;
 
-        // commented out event to handle it for migration, add back in?
+        // NOTED: Commented out event to handle it for migration, add back in?
         // emit Add(rid, keyType, key, key, metadataType, metadata);
 
         // if (validate) {
@@ -206,5 +210,4 @@ contract RiverRegistry is Trust2, Nonces {
     ////////////////////////////////////////////////////////////////
     // SIGNATURE HELPERS
     ////////////////////////////////////////////////////////////////                         
-
 }
