@@ -19,12 +19,14 @@ contract RiverRegistry is Trust2, Nonces {
     ////////////////////////////////////////////////////////////////       
 
     error Past_Migration_Cutoff();
+    error Already_Migrated();
 
     ////////////////////////////////////////////////////////////////
     // EVENTS (move these into interface later)
     ////////////////////////////////////////////////////////////////  
 
     event Register(address indexed to, uint256 id, address recovery);    
+    event Transfer(address indexed from, address indexed to, uint256 indexed id);
     event Add(
         uint256 indexed rid,
         uint32 indexed keyType,
@@ -33,7 +35,7 @@ contract RiverRegistry is Trust2, Nonces {
         uint8 metadataType,
         bytes metadata
     );
-    event Migrate(address indexed to, uint256 id, address recovery);    
+    event Migrate(indexed uint256 id);    
 
     ////////////////////////////////////////////////////////////////
     // TYPES (move these into interface later)
@@ -78,7 +80,7 @@ contract RiverRegistry is Trust2, Nonces {
 
     uint256 public constant MAX_KEYS_PER_RID = 500;
 
-    uint256 public immutable RID_MIGRATION_CUTOFF;
+    uint256 public constant RID_MIGRATION_CUTOFF = 200;
 
     ////////////////////////////////////////////////////////////////
     // STORAGE
@@ -89,6 +91,7 @@ contract RiverRegistry is Trust2, Nonces {
     mapping(address owner => uint256 rid) public idOf;
     mapping(uint256 rid => address owner) public custodyOf;
     mapping(uint256 rid => address recovery) public recoveryOf;
+    mapping(uint256 rid => bool migrated) public hasMigrated;
 
     /* Keys */
     IdRegistryLike public idRegistry;    
@@ -104,41 +107,57 @@ contract RiverRegistry is Trust2, Nonces {
     construtor(
         address initialOwner,
         address[] memory initialTrustedCallers,
-        uint256 ridMigrationCutoff
     ) Trust2(initialOwner), EIP712("RiverRegistry", "1") {
         // other stuff
         _setTrusted(initialTrustedCallers);
-        RID_MIGRATION_CUTOFF = ridMigrationCutoff;
     }  
 
     ////////////////////////////////////////////////////////////////
     // MIGRATION MANAGEMENT
     ////////////////////////////////////////////////////////////////      
 
+    // NOTE: do a test in foundry to understand if we can actually process
+    //       all the registers in one call or if we wanna split out to diff txns, etc
+    function trustedPrepMigration(address memory to, address recovery) onlyTrusted {
+        // Revert if targeting an rid after migration cutoff
+        if (rid > RID_MIGRATION_CUTOFF) revert Past_Migration_Cutoff();
+        // Process register without sig checks
+        _register(to, recovery);
+    }
+
     // TODO: should we add in a "already migrated" storage variable
     //       that would prevent an rid from being migrated more than once?
     //       quick answer is yes, but would mean if we mess up we have to redeploy the contract again while prod
     //       is live :(
-    function trustedMigrateFor(uint256 rid, address recipient, KeyRegistration[] memory keys) onlyTrusted external {
+    //       UPDATE: added the above ^ in because we should be able to not mess this up, plus can
+    //               always trigger a change through recovery flow in emergency
+    function trustedMigrateFor(uint256 rid, address recipient, address recovery, KeyRegistration[] memory keys) onlyTrusted external {
         // Revert if targeting an rid after migration cutoff
         if (rid > RID_MIGRATION_CUTOFF) revert Past_Migration_Cutoff();
-        // Revert if recipient address already owns an rid
-        if (idOf[recipient] != 0) revert Has_Id();
-        // Migrate rid
-        idOf[to] = rid;
-        custodyOf[rid] = to;
-        recoveryOf[rid] = recovery;        
-        emit Register(to, rid, recovery);
+        // Revert if rid has already migrated
+        if (hasMigrated[rid]) revert Already_Migrated();        
+
+        // check that rid is currently registered, and that recipient doesnt own rid
+        address fromCustody = _validateMigration(rid, recipient);
+        // transfer rid
+        _unsafeTransfer(rid, fromCustody, recipeint)
+        // change recovery addresss
+        _unsafeChangeRecovery(rid, recovery);
+
         // Add keys
         for (uint256 i; i < keys.length; ++i) {
             _add(rid, keys[i].keyType, keys[i].key, 0, new bytes(0))
-            emit Add(rid, keys[i].keyType, keys[i].key, keys[i].key, 0, new bytes(0));
         }
+
+        // update migration state for rid
+        hasMigrated[rid] = true;
+        emit Migrate(rid);
     }
 
     ////////////////////////////////////////////////////////////////
     // ID MANAGEMENT
     ////////////////////////////////////////////////////////////////
+
     
     function _register(address to, address recovery) internal returns (uint256 rid) {
         rid = _unsafeRegister(to, recovery);
@@ -156,6 +175,54 @@ contract RiverRegistry is Trust2, Nonces {
         custodyOf[rid] = to;
         recoveryOf[rid] = recovery;
     }
+
+    /**
+     * @dev Retrieve rid and validate sender/recipient
+     */
+    function _validateTransfer(address from, address to) internal view returns (uint256 fromId) {
+        fromId = idOf[from];
+
+        /* Revert if the sender has no id */
+        if (fromId == 0) revert Has_No_Id();
+        /* Revert if recipient has an id */
+        if (idOf[to] != 0) revert Has_Id();
+    }
+
+    /**
+     * @dev Transfer the rid to another address without checking invariants.
+     * @dev Will revert if contract is paused     
+     */
+     // add back in puausing?
+    function _unsafeTransfer(uint256 id, address from, address to) internal {
+        idOf[to] = id;
+        custodyOf[id] = to;
+        delete idOf[from];
+
+        emit Transfer(from, to, id);
+    }
+
+    /**
+     * @dev Change recovery address without checking invariants.
+     * @dev Will revert if contract is paused
+     */
+     // add back in pausing ??
+    function _unsafeChangeRecovery(uint256 id, address recovery) internal {
+        /* Change the recovery address */
+        recoveryOf[id] = recovery;
+
+        emit ChangeRecoveryAddress(id, recovery);
+    }    
+
+    /**
+     * @dev Retrieve custody and validate rid/recipient
+     */
+    function _validateMigration(uint256 rid, address to) internal view returns (address fromCustody) {
+        fromCustody = custodyOf[rid];
+        // Revert if rid not registered
+        if (fromCustody == address(0)) revert Has_No_Id();
+        // Revert if recipient already has rid
+        if (idOf[to] != 0) revert Has_Id();
+    }    
 
     ////////////////////////////////////////////////////////////////
     // KEY MANAGEMENT
@@ -194,8 +261,7 @@ contract RiverRegistry is Trust2, Nonces {
         keyData.state = KeyState.ADDED;
         keyData.keyType = keyType;
 
-        // NOTED: Commented out event to handle it for migration, add back in?
-        // emit Add(rid, keyType, key, key, metadataType, metadata);
+        emit Add(rid, keyType, key, key, metadataType, metadata);
 
         // if (validate) {
         //     bool isValid = validator.validate(rid, key, metadata);
