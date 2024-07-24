@@ -6,7 +6,7 @@ import {Ownable} from "@openzeppelin/access/Ownable.sol";
 
 import {EIP712} from "../abstract/EIP712.sol";
 import {IMetadataValidator} from "../interfaces/IMetadataValidator.sol";
-import {IdRegistryLike} from "../interfaces/IdRegistryLike.sol";
+import {RiverRegistryLike} from "../interfaces/RiverRegistryLike.sol";
 
 /**
  * @title River SignedKeyRequestValidator
@@ -38,12 +38,12 @@ contract SignedKeyRequestValidator is IMetadataValidator, Ownable2Step, EIP712 {
     //////////////////////////////////////////////////////////////*/
 
     /**
-     * @dev Emit an event when the admin sets a new IdRegistry contract address.
+     * @dev Emit an event when the admin sets a new RiverRegistry contract address.
      *
-     * @param oldIdRegistry The previous IdRegistry address.
-     * @param newIdRegistry The new IdRegistry address.
+     * @param oldRiverRegistry The previous RiverRegistry address.
+     * @param newRiverRegistry The new RiverRegistry address.
      */
-    event SetIdRegistry(address oldIdRegistry, address newIdRegistry);
+    event SetRiverRegistry(address oldRiverRegistry, address newRiverRegistry);
 
     /*//////////////////////////////////////////////////////////////
                               CONSTANTS
@@ -62,23 +62,22 @@ contract SignedKeyRequestValidator is IMetadataValidator, Ownable2Step, EIP712 {
     //////////////////////////////////////////////////////////////*/
 
     /**
-     * @dev The IdRegistry contract.
+     * @dev The RiverRegistry contract.
      */
-    IdRegistryLike public idRegistry;
+    RiverRegistryLike public riverRegistry;
 
     /*//////////////////////////////////////////////////////////////
                                CONSTRUCTOR
     //////////////////////////////////////////////////////////////*/
 
     /**
-     * @notice Set the IdRegistry and owner.
+     * @notice Set the RiverRegistry and owner.
      *
-     * @param _idRegistry   IdRegistry contract address.
-     * @param _initialOwner Initial contract owner address.
+     * @param _riverRegistry RiverRegistry contract address.
+     * @param _initialOwner  Initial contract owner address.
      */
-    constructor(address _idRegistry, address _initialOwner) Ownable(_initialOwner) EIP712("River SignedKeyRequestValidator", "1") {
-        idRegistry = IdRegistryLike(_idRegistry);
-        // _transferOwnership(_initialOwner);
+    constructor(address _riverRegistry, address _initialOwner) Ownable(_initialOwner) EIP712("River SignedKeyRequestValidator", "1") {
+        riverRegistry = RiverRegistryLike(_riverRegistry);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -102,13 +101,13 @@ contract SignedKeyRequestValidator is IMetadataValidator, Ownable2Step, EIP712 {
     ) external view returns (bool) {
         SignedKeyRequestMetadata memory metadata = abi.decode(signedKeyRequestBytes, (SignedKeyRequestMetadata));
 
-        if (idRegistry.idOf(metadata.requestSigner) != metadata.requestRid) {
+        if (riverRegistry.idOf(metadata.requestSigner) != metadata.requestRid) {
             return false;
         }
         if (block.timestamp > metadata.deadline) return false;
         if (key.length != 32) return false;
 
-        return idRegistry.verifyRidSignature(
+        return riverRegistry.verifyRidSignature(
             metadata.requestSigner,
             metadata.requestRid,
             _hashTypedDataV4(
@@ -138,12 +137,12 @@ contract SignedKeyRequestValidator is IMetadataValidator, Ownable2Step, EIP712 {
     //////////////////////////////////////////////////////////////*/
 
     /**
-     * @notice Set the IdRegistry contract address. Only callable by owner.
+     * @notice Set the RiverRegistry contract address. Only callable by owner.
      *
-     * @param _idRegistry The new IdRegistry address.
+     * @param _riverRegistry The new RiverRegistry address.
      */
-    function setIdRegistry(address _idRegistry) external onlyOwner {
-        emit SetIdRegistry(address(idRegistry), _idRegistry);
-        idRegistry = IdRegistryLike(_idRegistry);
+    function setRiverRegistry(address _riverRegistry) external onlyOwner {
+        riverRegistry = RiverRegistryLike(_riverRegistry);
+        emit SetRiverRegistry(address(riverRegistry), _riverRegistry);        
     }
 }

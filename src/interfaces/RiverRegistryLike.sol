@@ -2,9 +2,9 @@
 pragma solidity 0.8.23;
 
 /**
- * @dev Minimal interface for IdRegistry, used by the KeyRegistry.
+ * @dev Minimal interface for RiverRegistry, used by the SignedKeyRequestValidator
  */
-interface IdRegistryLike {
+interface RiverRegistryLike {
     /*//////////////////////////////////////////////////////////////
                                  STORAGE
     //////////////////////////////////////////////////////////////*/
