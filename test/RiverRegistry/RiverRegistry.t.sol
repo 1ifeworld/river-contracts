@@ -15,7 +15,7 @@ import "./RiverRegistryTestSuite.sol";
 contract RiverRegistryTest is RiverRegistryTestSuite {       
 
     //////////////////////////////////////////////////
-    // SIGNATURE BASED WRITES
+    // TRUSTED PREP MIGRATION
     //////////////////////////////////////////////////    
 
     function test_prepMigrate() public {
@@ -72,4 +72,17 @@ contract RiverRegistryTest is RiverRegistryTestSuite {
         riverRegistry.trustedPrepMigration(anotherRandomAccount, recovery.addr);
         assertEq(riverRegistry.idCount(), migrationCutoff);
     }     
+
+    //////////////////////////////////////////////////
+    // TRUSTED MIGRATE FOR
+    //////////////////////////////////////////////////      
+
+    // invariants
+    // - only trusted
+    // - only for rids 1-200
+    // - only if rid has not been migrated yet
+    // - no dup custody
+
+    // other cases
+    // - should work for rids 1-200 even once other ids are being registered via normal register post 200
 }
