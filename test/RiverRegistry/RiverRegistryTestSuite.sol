@@ -22,7 +22,12 @@ abstract contract RiverRegistryTestSuite is TestSuiteSetup {
 
     //////////////////////////////////////////////////
     // TEST HELPERS
-    //////////////////////////////////////////////////               
+    //////////////////////////////////////////////////             
+
+    function randomAccount(uint256 entropy) public pure returns (address) {
+        bytes32 hash = keccak256(abi.encode(entropy));
+        return address(uint160(uint256(hash)));
+    }  
 
     /* EOA STUFF */
 

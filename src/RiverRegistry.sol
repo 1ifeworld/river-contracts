@@ -24,7 +24,7 @@ contract RiverRegistry is Trust, Nonces, EIP712 {
     error Has_Id();
     //
     error ExceedsMaximum();
-    error ValidatorNotFound(uint32, uint8);
+    error ValidatorNotFound(uint32 keyType, uint8 metadataType);
     error InvalidState();
 
     ////////////////////////////////////////////////////////////////
@@ -130,7 +130,7 @@ contract RiverRegistry is Trust, Nonces, EIP712 {
     //       all the registers in one call or if we wanna split out to diff txns, etc
     function trustedPrepMigration(address to, address recovery) onlyTrusted public {
         // Revert if targeting an rid after migration cutoff
-        if (idCount > RID_MIGRATION_CUTOFF) revert Past_Migration_Cutoff();
+        if (idCount >= RID_MIGRATION_CUTOFF) revert Past_Migration_Cutoff();
         // Process register without sig checks
         _register(to, recovery);
     }
@@ -164,16 +164,10 @@ contract RiverRegistry is Trust, Nonces, EIP712 {
         emit Migrate(rid);
     }
 
-        // uint256 rid,
-        // uint32 keyType,
-        // bytes calldata key,
-        // uint8 metadataType,
-        // bytes calldata metadata
-
-
     /**
      * @dev Retrieve custody and validate rid/recipient
      */
+     // add pausable here?
     function _validateMigration(uint256 rid, address to) internal view returns (address fromCustody) {
         // Retrieve current custody address of target rid
         fromCustody = custodyOf[rid];
@@ -182,7 +176,6 @@ contract RiverRegistry is Trust, Nonces, EIP712 {
         // Revert if recipient already has rid
         if (idOf[to] != 0) revert Has_Id();
     }    
-
 
     ////////////////////////////////////////////////////////////////
     // ID MANAGEMENT
