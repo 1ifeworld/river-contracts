@@ -181,6 +181,9 @@ contract RiverRegistry is Trust, Nonces, EIP712 {
     // ID MANAGEMENT
     ////////////////////////////////////////////////////////////////
 
+    // NOTE: ideas for initial compatiability with migration flow
+    // add in checks on register function to not be callable within first 200 ids?
+    // add in a state variable switch that enables it to be called after first 200?
     
     function _register(address to, address recovery) internal returns (uint256 rid) {
         rid = _unsafeRegister(to, recovery);
