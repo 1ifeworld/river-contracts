@@ -24,10 +24,25 @@ abstract contract RiverRegistryTestSuite is TestSuiteSetup {
     // TEST HELPERS
     //////////////////////////////////////////////////             
 
-    function randomAccount(uint256 entropy) public pure returns (address) {
+    function randomishAccount(uint256 entropy) public pure returns (address) {
         bytes32 hash = keccak256(abi.encode(entropy));
         return address(uint160(uint256(hash)));
     }  
+
+    function generateKeyInits(uint256 numKeys) internal returns (RiverRegistry.KeyRegistration[][] memory) {
+        RiverRegistry.KeyRegistration[][] memory keys = new RiverRegistry.KeyRegistration[][](numKeys);
+        for (uint256 i; i < numKeys; ++i) {
+            RiverRegistry.KeyRegistration[] memory init = new RiverRegistry.KeyRegistration[](1);
+            init[0] = RiverRegistry.KeyRegistration({
+                keyType: 1,
+                key: new bytes(i),
+                metadataType: 1,
+                metadata: new bytes(0)
+            });
+            keys[i] = init;
+        }
+        return keys;
+    }    
 
     /* EOA STUFF */
 

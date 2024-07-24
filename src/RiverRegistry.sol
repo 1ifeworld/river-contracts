@@ -66,6 +66,7 @@ contract RiverRegistry is Trust, Nonces, EIP712 {
         bytes metadata;
     }
 
+    /* NOTE: currently not in use */
     struct RegistrationParams {
         address to;
         address recovery;
@@ -184,6 +185,10 @@ contract RiverRegistry is Trust, Nonces, EIP712 {
     // NOTE: ideas for initial compatiability with migration flow
     // add in checks on register function to not be callable within first 200 ids?
     // add in a state variable switch that enables it to be called after first 200?
+
+    /**
+     *  REGISGTRATION
+     */
     
     function _register(address to, address recovery) internal returns (uint256 rid) {
         rid = _unsafeRegister(to, recovery);
@@ -201,6 +206,10 @@ contract RiverRegistry is Trust, Nonces, EIP712 {
         custodyOf[rid] = to;
         recoveryOf[rid] = recovery;
     }
+
+    /**
+     *  TRANSFER
+     */    
 
     /**
      * @dev Retrieve rid and validate sender/recipient
@@ -226,6 +235,10 @@ contract RiverRegistry is Trust, Nonces, EIP712 {
 
         emit Transfer(from, to, id);
     }
+
+    /**
+     *  RECOVER
+     */ 
 
     /**
      * @dev Change recovery address without checking invariants.
@@ -267,10 +280,10 @@ contract RiverRegistry is Trust, Nonces, EIP712 {
         if (keyData.state != KeyState.NULL) revert InvalidState();
         if (totalKeys(rid, KeyState.ADDED) >= MAX_KEYS_PER_RID) revert ExceedsMaximum();
 
-        IMetadataValidator validator = validators[keyType][metadataType];
-        if (validator == IMetadataValidator(address(0))) {
-            revert ValidatorNotFound(keyType, metadataType);
-        }
+        // IMetadataValidator validator = validators[keyType][metadataType];
+        // if (validator == IMetadataValidator(address(0))) {
+        //     revert ValidatorNotFound(keyType, metadataType);
+        // }
 
         _addToKeySet(rid, key);
         keyData.state = KeyState.ADDED;
