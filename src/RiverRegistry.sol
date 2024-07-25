@@ -2,7 +2,6 @@
 pragma solidity 0.8.23;
 
 import {EnumerableKeySet, KeySet} from "./libraries/EnumerableKeySet.sol";
-import {IMetadataValidator} from "./interfaces/IMetadataValidator.sol";
 import {Trust} from "./abstract/Trust.sol";
 import {Nonces} from "./abstract/Nonces.sol";
 import {EIP712} from "./abstract/EIP712.sol";
