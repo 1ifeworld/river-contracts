@@ -29,19 +29,24 @@ abstract contract RiverRegistryTestSuite is TestSuiteSetup {
         return address(uint160(uint256(hash)));
     }  
 
-    function generateKeyInits(uint256 numKeys) internal returns (RiverRegistry.KeyRegistration[][] memory) {
+    function generateKeyInits(uint256 numKeys) public returns (RiverRegistry.KeyRegistration[][] memory) {
         RiverRegistry.KeyRegistration[][] memory keys = new RiverRegistry.KeyRegistration[][](numKeys);
         for (uint256 i; i < numKeys; ++i) {
             RiverRegistry.KeyRegistration[] memory init = new RiverRegistry.KeyRegistration[](1);
             init[0] = RiverRegistry.KeyRegistration({
                 keyType: 1,
-                key: new bytes(i),
-                metadataType: 1,
-                metadata: new bytes(0)
+                key: new bytes(i)
             });
             keys[i] = init;
         }
         return keys;
+    }
+
+    function _prepMigrateForAccounts(uint256 numAccounts) internal {
+        for (uint256 i; i < numAccounts; ++i) {
+            address randomAccount = randomishAccount(i);
+            riverRegistry.trustedPrepMigration(randomAccount, recovery.addr);
+        }        
     }    
 
     /* EOA STUFF */

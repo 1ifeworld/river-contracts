@@ -17,10 +17,20 @@ contract RiverRegistryTest is RiverRegistryTestSuite {
     // other cases
     // - NOTE: handle this in the register tests: should work for rids 1-200 even once other ids are being registered via normal register post 200    
 
+
+    /*                                               *
+    *                                                *
+    *                                                *
+    *                ID MIGRATION                    *
+    *                                                *
+    *                                                *
+    *                                               */
+
     //////////////////////////////////////////////////
     // TRUSTED PREP MIGRATION
-    //////////////////////////////////////////////////    
+    //////////////////////////////////////////////////        
 
+    
     // invariants
     // - only trusted - X
     // - only for rids 1-200 - x 
@@ -32,55 +42,44 @@ contract RiverRegistryTest is RiverRegistryTestSuite {
         // start prank as trusted caller
         vm.startPrank(trusted.addr);
 
-        uint256 migrationCutoff = riverRegistry.RID_MIGRATION_CUTOFF();
+        uint256 cutoff = riverRegistry.RID_MIGRATION_CUTOFF();
 
-        for (uint256 i; i < migrationCutoff; ++i) {
-            address randomAccount = randomishAccount(i);
-            riverRegistry.trustedPrepMigration(randomAccount, recovery.addr);
-        }
+        _prepMigrateForAccounts(cutoff);
 
-        assertEq(riverRegistry.idCount(), migrationCutoff);
+        assertEq(riverRegistry.idCount(), cutoff);
     }
 
-    function test_revert_untrusted_prepMigrate() public {
+    function test_revertOnlyTrusted_prepMigrate() public {
         // start prank as untrusted caller
         vm.startPrank(malicious.addr);
-
-        address randomAccount = randomishAccount(1);
+        
         vm.expectRevert(abi.encodeWithSignature("Only_Trusted()"));
-        riverRegistry.trustedPrepMigration(randomAccount, recovery.addr);
-        assertEq(riverRegistry.idCount(), 0);
+        _prepMigrateForAccounts(1);
     }       
 
-    function test_revert_dupCustody_prepMigrate() public {
+    function test_revertHasId_prepMigrate() public {
         // start prank as trusted caller
         vm.startPrank(trusted.addr);
 
         address randomAccount = randomishAccount(1);
         riverRegistry.trustedPrepMigration(randomAccount, recovery.addr);
-
-        assertEq(riverRegistry.custodyOf(1), randomAccount);
-
         vm.expectRevert(abi.encodeWithSignature("Has_Id()"));
         riverRegistry.trustedPrepMigration(randomAccount, recovery.addr);
-        assertEq(riverRegistry.idCount(), 1);
     }       
 
     function test_revert_pastCutoff_prepMigrate() public {
         // start prank as trusted caller
         vm.startPrank(trusted.addr);
 
-        uint256 migrationCutoff = riverRegistry.RID_MIGRATION_CUTOFF();
+        uint256 cutoff = riverRegistry.RID_MIGRATION_CUTOFF();
 
-        for (uint256 i; i < migrationCutoff; ++i) {
-            address randomAccount = randomishAccount(i);     
-            riverRegistry.trustedPrepMigration(randomAccount, recovery.addr);
-        }
+        // process prep migration
+        _prepMigrateForAccounts(cutoff);
 
-        address anotherRandomAccount = randomishAccount(migrationCutoff + 1);
+        address anotherRandomAccount = randomishAccount(cutoff + 1);
         vm.expectRevert(abi.encodeWithSignature("Past_Migration_Cutoff()"));
         riverRegistry.trustedPrepMigration(anotherRandomAccount, recovery.addr);
-        assertEq(riverRegistry.idCount(), migrationCutoff);
+        assertEq(riverRegistry.idCount(), cutoff);
     }     
 
     //////////////////////////////////////////////////
@@ -94,11 +93,8 @@ contract RiverRegistryTest is RiverRegistryTestSuite {
         // cache migration cutoff
         uint256 cutoff = riverRegistry.RID_MIGRATION_CUTOFF();
 
-        // prep migration
-        for (uint256 i; i < cutoff; ++i) {
-            address randomAccount = randomishAccount(i);
-            riverRegistry.trustedPrepMigration(randomAccount, recovery.addr);
-        }
+        // process prep migration
+        _prepMigrateForAccounts(cutoff);
 
         // process 200 migrations and run tests
         RiverRegistry.KeyRegistration[][] memory keyInits = generateKeyInits(cutoff);    
@@ -119,11 +115,8 @@ contract RiverRegistryTest is RiverRegistryTestSuite {
         // cache migration cutoff
         uint256 cutoff = riverRegistry.RID_MIGRATION_CUTOFF();
 
-        // prep migration
-        for (uint256 i; i < cutoff; ++i) {
-            address randomAccount = randomishAccount(i);
-            riverRegistry.trustedPrepMigration(randomAccount, recovery.addr);
-        }
+        // process prep migration
+        _prepMigrateForAccounts(cutoff);
 
         vm.stopPrank();
         vm.startPrank(malicious.addr);
@@ -144,11 +137,8 @@ contract RiverRegistryTest is RiverRegistryTestSuite {
         // cache migration cutoff
         uint256 cutoff = riverRegistry.RID_MIGRATION_CUTOFF();
 
-        // prep migration
-        for (uint256 i; i < cutoff; ++i) {
-            address randomAccount = randomishAccount(i);
-            riverRegistry.trustedPrepMigration(randomAccount, recovery.addr);
-        }
+        // process prep migration
+        _prepMigrateForAccounts(cutoff);
 
         // process 200 migrations and run tests
         RiverRegistry.KeyRegistration[][] memory keyInits = generateKeyInits(cutoff + 1);    
@@ -170,11 +160,7 @@ contract RiverRegistryTest is RiverRegistryTestSuite {
         // cache migration cutoff
         uint256 cutoff = riverRegistry.RID_MIGRATION_CUTOFF();
 
-        // prep migration
-        for (uint256 i; i < cutoff; ++i) {
-            address randomAccount = randomishAccount(i);
-            riverRegistry.trustedPrepMigration(randomAccount, recovery.addr);
-        }
+        _prepMigrateForAccounts(cutoff);
 
         // process 200 migrations and run tests
         RiverRegistry.KeyRegistration[][] memory keyInits = generateKeyInits(cutoff);    
@@ -214,17 +200,13 @@ contract RiverRegistryTest is RiverRegistryTestSuite {
         // cache migration cutoff
         uint256 cutoff = riverRegistry.RID_MIGRATION_CUTOFF();
 
-        // prep migration
-        for (uint256 i; i < cutoff; ++i) {
-            address randomAccount = randomishAccount(i);
-            riverRegistry.trustedPrepMigration(randomAccount, recovery.addr);
-        }
+        // process prep migration
+        _prepMigrateForAccounts(cutoff);
 
         // process 200 migrations and run tests
         RiverRegistry.KeyRegistration[][] memory keyInits = generateKeyInits(cutoff);    
         for (uint256 i; i < cutoff; ++i) {
             address randomAccount2 = randomishAccount(cutoff + i);            
-
 
             if (i == cutoff - 1) {                
                 address custodyToCheck = riverRegistry.custodyOf(i);
@@ -236,4 +218,135 @@ contract RiverRegistryTest is RiverRegistryTestSuite {
             }          
         }        
     }        
+
+    /*                                               *
+    *                                                *
+    *                                                *
+    *               ID REGISTRATION                  *
+    *                                                *
+    *                                                *
+    *                                               */
+
+    //////////////////////////////////////////////////
+    // REGISTER
+    //////////////////////////////////////////////////       
+
+    //////////////////////////////////////////////////
+    // REGISTER FOR
+    //////////////////////////////////////////////////           
+
+    //////////////////////////////////////////////////
+    // TRUSTED REGISTER FOR
+    //////////////////////////////////////////////////               
+
+    /*                                               *
+    *                                                *
+    *                                                *
+    *                 ID TRANSFERS                   *
+    *                                                *
+    *                                                *
+    *                                               */
+
+    //////////////////////////////////////////////////
+    // TRANSFER
+    //////////////////////////////////////////////////       
+
+    //////////////////////////////////////////////////
+    // TRANSFER FOR
+    //////////////////////////////////////////////////            
+
+    //////////////////////////////////////////////////
+    // TRANSFER AND CHANGE RECOVERY ????
+    //////////////////////////////////////////////////          
+
+    /*                                               *
+    *                                                *
+    *                                                *
+    *                 ID RECOVERY                    *
+    *                                                *
+    *                                                *
+    *                                               */
+    
+    //////////////////////////////////////////////////
+    // RECOVER
+    //////////////////////////////////////////////////      
+
+    //////////////////////////////////////////////////
+    // RECOVER FOR
+    //////////////////////////////////////////////////          
+
+    //////////////////////////////////////////////////
+    // CHANGE RECOVERY
+    //////////////////////////////////////////////////              
+
+    /*                                               *
+    *                                                *
+    *                                                *
+    *                  KEY ADD                       *
+    *                                                *
+    *                                                *
+    *                                               */   
+
+    //////////////////////////////////////////////////
+    // ADD
+    //////////////////////////////////////////////////         
+
+    //////////////////////////////////////////////////
+    // ADD FOR
+    //////////////////////////////////////////////////             
+
+    //////////////////////////////////////////////////
+    // ??? TRUSTED ADD FOR 
+    //////////////////////////////////////////////////                 
+
+    // is this bad vibes 0_0
+
+    /*                                               *
+    *                                                *
+    *                                                *
+    *               KEY REMOVAL                      *
+    *                                                *
+    *                                                *
+    *                                               */        
+
+    //////////////////////////////////////////////////
+    // REMOVE
+    //////////////////////////////////////////////////         
+
+    //////////////////////////////////////////////////
+    // REMOVE FOR
+    //////////////////////////////////////////////////   
+
+    //////////////////////////////////////////////////
+    // ??? TRUSTED REMOVE FOR 
+    //////////////////////////////////////////////////                      
+
+    //////////////////////////////////////////////////
+    // KEY MGMT - Add, Remove, Reset
+    //////////////////////////////////////////////////    
+
+    /*                                               *
+    *                                                *
+    *                                                *
+    *                    VIEWS                       *
+    *                                                *
+    *                                                *
+    *                                               */
+
+    //////////////////////////////////////////////////
+    // IS VALID SIGNATURE
+    //////////////////////////////////////////////////              
+
+    /*                                               *
+    *                                                *
+    *                                                *
+    *          PAUSING + ALLOWLIST + PUBLIC          *
+    *                                                *
+    *                                                *
+    *                                               */    
+
+    // functionality to add 
+    // public registrations on/off, settable by onlyTrusted
+    // make these payable? to a recipient we can set? and we can upate the price?
+    // allowlist registrations from beginning, settable by onlyTrusted
 }

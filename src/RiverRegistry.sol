@@ -37,9 +37,7 @@ contract RiverRegistry is Trust, Nonces, EIP712 {
         uint256 indexed rid,
         uint32 indexed keyType,
         bytes indexed key,
-        bytes keyBytes,
-        uint8 metadataType,
-        bytes metadata
+        bytes keyBytes
     );
     event Migrate(uint256 indexed id);    
     event ChangeRecoveryAddress(uint256 indexed id, address indexed recovery);
@@ -62,8 +60,6 @@ contract RiverRegistry is Trust, Nonces, EIP712 {
     struct KeyRegistration {
         uint32 keyType;
         bytes key;
-        uint8 metadataType;
-        bytes metadata;
     }
 
     /* NOTE: currently not in use */
@@ -105,7 +101,6 @@ contract RiverRegistry is Trust, Nonces, EIP712 {
     mapping(uint256 rid => KeySet activeKeys) internal _activeKeysByRid;
     mapping(uint256 rid => KeySet removedKeys) internal _removedKeysByRid;    
     mapping(uint256 rid => mapping(bytes key => KeyData data)) public keys;    
-    mapping(uint32 keyType => mapping(uint8 metadataType => IMetadataValidator validator)) public validators; 
 
     ////////////////////////////////////////////////////////////////
     // CONSTRUCTOR
@@ -157,7 +152,9 @@ contract RiverRegistry is Trust, Nonces, EIP712 {
 
         // Add keys
         for (uint256 i; i < keyInit.length; ++i) {
-            _add(rid, keyInit[i].keyType, keyInit[i].key, keyInit[i].metadataType, keyInit[i].metadata);
+            // false included to skip key validation pathway for migration users
+            // since we dont have our own rid setup for signing add key requests yet
+            _add(rid, keyInit[i].keyType, keyInit[i].key);
         }
 
         // update migration state for rid
@@ -256,45 +253,23 @@ contract RiverRegistry is Trust, Nonces, EIP712 {
     // KEY MANAGEMENT
     ////////////////////////////////////////////////////////////////   
 
-    // NOTE: add back in pausing?
-    function _add(
-        uint256 rid,
-        uint32 keyType,
-        bytes calldata key,
-        uint8 metadataType,
-        bytes calldata metadata
-    ) internal {
-        _add(rid, keyType, key, metadataType, metadata, true);
-    }
 
-    // NOTE: add in key valdation functionality?? or remove for this first version
+    // NOTE: removed key validaton from this version of contract
+    // add back in pausing
     function _add(
         uint256 rid,
         uint32 keyType,
-        bytes calldata key,
-        uint8 metadataType,
-        bytes calldata metadata,
-        bool /*validate*/
+        bytes calldata key
     ) internal {
         KeyData storage keyData = keys[rid][key];
         if (keyData.state != KeyState.NULL) revert InvalidState();
         if (totalKeys(rid, KeyState.ADDED) >= MAX_KEYS_PER_RID) revert ExceedsMaximum();
 
-        // IMetadataValidator validator = validators[keyType][metadataType];
-        // if (validator == IMetadataValidator(address(0))) {
-        //     revert ValidatorNotFound(keyType, metadataType);
-        // }
-
         _addToKeySet(rid, key);
         keyData.state = KeyState.ADDED;
         keyData.keyType = keyType;
 
-        emit Add(rid, keyType, key, key, metadataType, metadata);
-
-        // if (validate) {
-        //     bool isValid = validator.validate(rid, key, metadata);
-        //     if (!isValid) revert InvalidMetadata();
-        // }
+        emit Add(rid, keyType, key, key);
     }                 
 
 
