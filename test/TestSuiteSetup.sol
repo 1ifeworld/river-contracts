@@ -61,7 +61,8 @@ abstract contract TestSuiteSetup is Test {
         owners.push(abi.encode(user.addr));
         owners.push(abi.encode(trusted.addr));
         owners.push(passkeyOwner);
-        smartWallet = smartWalletFactory.createAccount(owners, nonce);                     
+        // NOTE: commented this code out, so in tests you can decide to deploy before/not making any actions/sigs
+        // smartWallet = smartWalletFactory.createAccount(owners, nonce);
     }
 
     /*//////////////////////////////////////////////////////////////

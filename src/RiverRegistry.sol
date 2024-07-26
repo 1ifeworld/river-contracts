@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.23;
 
+import {Pausable} from "@openzeppelin/utils/Pausable.sol";
 import {IRiverRegistry} from "./interfaces/IRiverRegistry.sol";
 import {EnumerableKeySet, KeySet} from "./libraries/EnumerableKeySet.sol";
 import {Business} from "./abstract/Business.sol";
@@ -11,7 +12,7 @@ import {Signatures} from "./abstract/Signatures.sol";
 /**
  * @title RiverRegistry
  */
-contract RiverRegistry is IRiverRegistry, Business, Nonces, Signatures, EIP712 {
+contract RiverRegistry is IRiverRegistry, Business, Pausable, Nonces, Signatures, EIP712 {
     using EnumerableKeySet for KeySet;
 
     /* * * * * * * * * * * * * * * * * * * * * * * * *
@@ -91,7 +92,7 @@ contract RiverRegistry is IRiverRegistry, Business, Nonces, Signatures, EIP712 {
 
     // NOTE: do a test in foundry to understand if we can actually process
     //       all the issues in one call or if we wanna split out to diff txns, etc
-    function trustedPrepMigration(address to, address recovery) onlyTrusted public {
+    function trustedPrepMigration(address to, address recovery) public onlyTrusted {
         // Revert if targeting an rid after migration cutoff
         if (idCount >= RID_MIGRATION_CUTOFF) revert Past_Migration_Cutoff();
         // Process issue without sig checks
@@ -104,7 +105,7 @@ contract RiverRegistry is IRiverRegistry, Business, Nonces, Signatures, EIP712 {
     //       is live :(
     //       UPDATE: added the above ^ in because we should be able to not mess this up, plus can
     //               always trigger a change through recovery flow in emergency
-    function trustedMigrateFor(uint256 rid, address recipient, address recovery, KeyInit[] calldata keyInits) onlyTrusted public {
+    function trustedMigrateFor(uint256 rid, address recipient, address recovery, KeyInit[] calldata keyInits) public onlyTrusted {
         // Revert if targeting an rid after migration cutoff
         if (rid > RID_MIGRATION_CUTOFF) revert Past_Migration_Cutoff();
         // Revert if rid has already migrated
@@ -154,7 +155,7 @@ contract RiverRegistry is IRiverRegistry, Business, Nonces, Signatures, EIP712 {
     // REGISTER
     //////////////////////////////////////////////////      
 
-    function register(address recovery, KeyInit[] calldata keyInits) paid external payable returns (uint256 rid) {
+    function register(address recovery, KeyInit[] calldata keyInits) external paid payable returns (uint256 rid) {
         // Check if recipient is allowed
         _isAllowed(msg.sender);
         // Process register and add
@@ -163,7 +164,7 @@ contract RiverRegistry is IRiverRegistry, Business, Nonces, Signatures, EIP712 {
         if (!isPublic) _unsafeDecreaseAllowance(msg.sender);
     }
 
-    function registerFor(address recipient, address recovery, KeyInit[] calldata keyInits, uint256 deadline, bytes calldata sig) paid external payable returns (uint256 rid) {        
+    function registerFor(address recipient, address recovery, KeyInit[] calldata keyInits, uint256 deadline, bytes calldata sig) external paid payable returns (uint256 rid) {        
         // Revert if signature invalid
         _verifyRegisterSig(recipient, recovery, keyInits, deadline, sig);
         // Check if recipient is allowed
@@ -179,7 +180,8 @@ contract RiverRegistry is IRiverRegistry, Business, Nonces, Signatures, EIP712 {
     // TODO: is this bad? could restrict `register` to non-trusted callers, but seems unncessary gas wise
     // @dev bypasses allowance checks
     // @dev bypasses payment checks
-    function trustedRegisterFor(address recipient, address recovery, KeyInit[] calldata keyInits) onlyTrusted external returns (uint256 rid) {
+    // NOTE: add payable? without price check?
+    function trustedRegisterFor(address recipient, address recovery, KeyInit[] calldata keyInits) external onlyTrusted returns (uint256 rid) {
         rid = _issueAndAdd(recipient, recovery, keyInits);
     }
 
@@ -199,8 +201,7 @@ contract RiverRegistry is IRiverRegistry, Business, Nonces, Signatures, EIP712 {
         emit Issue(to, idCount, recovery);
     }
 
-    // NOTE: add back in pausing?
-    function _unsafeIssue(address to, address recovery) internal returns (uint256 rid) {
+    function _unsafeIssue(address to, address recovery) internal whenNotPaused returns (uint256 rid) {
         /* Revert if the target(to) has an rid */
         if (idOf[to] != 0) revert Has_Id();
         /* Incrementing before assignment ensures that no one gets the 0 rid. */
@@ -214,6 +215,9 @@ contract RiverRegistry is IRiverRegistry, Business, Nonces, Signatures, EIP712 {
     //////////////////////////////////////////////////
     // TRANSFER
     //////////////////////////////////////////////////      
+
+    // transfer()
+    // transferFor()
 
     /**
      * @dev Retrieve rid and validate sender/recipient
@@ -232,7 +236,7 @@ contract RiverRegistry is IRiverRegistry, Business, Nonces, Signatures, EIP712 {
      * @dev Will revert if contract is paused     
      */
      // add back in puausing?
-    function _unsafeTransfer(uint256 id, address from, address to) internal {
+    function _unsafeTransfer(uint256 id, address from, address to) internal whenNotPaused {
         idOf[to] = id;
         custodyOf[id] = to;
         delete idOf[from];
@@ -244,12 +248,16 @@ contract RiverRegistry is IRiverRegistry, Business, Nonces, Signatures, EIP712 {
     // RECOVER
     //////////////////////////////////////////////////      
 
+    // changeRecoveryAddress()
+    // recover()
+    // recoverFor()
+
     /**
      * @dev Change recovery address without checking invariants.
      * @dev Will revert if contract is paused
      */
      // add back in pausing ??
-    function _unsafeChangeRecovery(uint256 id, address recovery) internal {
+    function _unsafeChangeRecovery(uint256 id, address recovery) internal whenNotPaused {
         /* Change the recovery address */
         recoveryOf[id] = recovery;
 
@@ -262,6 +270,7 @@ contract RiverRegistry is IRiverRegistry, Business, Nonces, Signatures, EIP712 {
 
     // add()
     // addFor()
+    // trustedAddFor() ???
 
     // NOTE: removed key validaton from this version of contract
     // add back in pausing
@@ -269,7 +278,7 @@ contract RiverRegistry is IRiverRegistry, Business, Nonces, Signatures, EIP712 {
         uint256 rid,
         uint32 keyType,
         bytes calldata key
-    ) internal {
+    ) internal whenNotPaused {
         KeyData storage keyData = keys[rid][key];
         if (keyData.state != KeyState.NULL) revert InvalidState();
         if (totalKeys(rid, KeyState.ADDED) >= MAX_KEYS_PER_RID) revert ExceedsMaximum();
@@ -292,6 +301,8 @@ contract RiverRegistry is IRiverRegistry, Business, Nonces, Signatures, EIP712 {
 
     // remove()
     // removeFor()
+    // _remove() - this should have whenNotPaused modifier
+    // trustedRemoveFor() ???
 
     function _removeFromKeySet(uint256 rid, bytes calldata key) internal virtual {
         _activeKeysByRid[rid].remove(key);
@@ -301,6 +312,8 @@ contract RiverRegistry is IRiverRegistry, Business, Nonces, Signatures, EIP712 {
     ////////////////////////////////////////////////////////////////
     // VIEWS
     ////////////////////////////////////////////////////////////////        
+
+    // isValidSignatureForRid() ???
 
     function totalKeys(uint256 rid, KeyState state) public view virtual returns (uint256) {
         return _keysByState(rid, state).length();
@@ -315,7 +328,6 @@ contract RiverRegistry is IRiverRegistry, Business, Nonces, Signatures, EIP712 {
     function keysOf(uint256 rid, KeyState state) external view returns (bytes[] memory) {
         return _keysByState(rid, state).values();
     }
-
 
     function keysOf(
         uint256 rid,
@@ -364,9 +376,13 @@ contract RiverRegistry is IRiverRegistry, Business, Nonces, Signatures, EIP712 {
     *                                                *
     * * * * * * * * * * * * * * * * * * * * * * * * */  
 
-    // pause
-    // unpause
-    // anything else?
+    function pause() external onlyOwner {
+        _pause();
+    }
+
+    function unpause() external onlyOwner {
+        _unpause();
+    }
     
     /* * * * * * * * * * * * * * * * * * * * * * * * *
     *                                                *
@@ -375,6 +391,10 @@ contract RiverRegistry is IRiverRegistry, Business, Nonces, Signatures, EIP712 {
     *                                                *
     *                                                *
     * * * * * * * * * * * * * * * * * * * * * * * * */  
+
+    // verifyTransferSig()
+    // verifyRecoverSig()
+    // verifyAddSig()
 
     function _verifyRegisterSig(address to, address recovery, KeyInit[] calldata keyInits, uint256 deadline, bytes memory sig) internal {
         _verifySigWithDeadline(

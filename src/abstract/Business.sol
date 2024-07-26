@@ -47,10 +47,10 @@ abstract contract Business is Trust {
     *                                                *
     * * * * * * * * * * * * * * * * * * * * * * * * */       
 
-    uint256 price;    
-    address payoutRecipient;        
+    uint256 public price;    
+    address public payoutRecipient;        
     bool public isPublic;
-    mapping(address account => uint256 allowance) allowanceFor;
+    mapping(address account => uint256 allowance) public allowanceOf;
 
     /* * * * * * * * * * * * * * * * * * * * * * * * *
     *                                                *
@@ -83,25 +83,25 @@ abstract contract Business is Trust {
     }
 
     function increaseAllowance(address account, uint256 increase) onlyTrusted external returns (uint256 newAllowance) {
-        newAllowance = allowanceFor[account] + increase;
+        newAllowance = allowanceOf[account] += increase;
         emit Allowance(account, newAllowance);
     }
 
     function clearAllowance(address account) onlyTrusted external {
         // Delete sets value to 0, which is then emitted as `newAllowance`
-        delete allowanceFor[account];
+        delete allowanceOf[account];
         emit Allowance(account, 0);
     }
 
     // only called when `isPublic` == false
     function _unsafeDecreaseAllowance(address account) internal {
-        uint256 newAllowance = --allowanceFor[account];
+        uint256 newAllowance = --allowanceOf[account];
         emit Allowance(account, newAllowance);
     }             
 
     function _isAllowed(address account) internal view {
         if (!isPublic) {
-            if (allowanceFor[account] == 0) revert Not_Allowed();
+            if (allowanceOf[account] == 0) revert Not_Allowed();
         }        
     }
 

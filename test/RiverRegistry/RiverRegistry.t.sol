@@ -14,6 +14,15 @@ import "./RiverRegistryTestSuite.sol";
 
 contract RiverRegistryTest is RiverRegistryTestSuite {       
 
+    /*
+        WIP notes
+        - add checks to migrateFor to make sure old storage is cleareds
+        - add in pause checks for everything
+        - add in event tests for everything
+        -
+
+    */
+
     /* * * * * * * * * * * * * * * * * * * * * * * * *
     *                                                *
     *                                                *
@@ -165,7 +174,7 @@ contract RiverRegistryTest is RiverRegistryTestSuite {
             address randomAccount3 = randomishAccount(cutoff + cutoff + i);        
             // try to migrate a second time for each one and fail
             vm.expectRevert(abi.encodeWithSignature("Already_Migrated()"));
-            riverRegistry.trustedMigrateFor(i + 1, randomAccount2, recovery.addr, keyInits[i]);
+            riverRegistry.trustedMigrateFor(i + 1, randomAccount3, recovery.addr, keyInits[i]);
         }        
     }   
 
@@ -220,24 +229,18 @@ contract RiverRegistryTest is RiverRegistryTestSuite {
     *               ID REGISTRATION                  *
     *                                                *
     *                                                *
-    * * * * * * * * * * * * * * * * * * * * * * * * */
+    * * * * * * * * * * * * * * * * * * * * * * * * */  
 
-    // other cases
-    // - NOTE: handle this in the register tests: should work for rids 1-200 even once other ids are being registered via normal register post 200      
-
-    //////////////////////////////////////////////////
-    // REGISTER
-    //////////////////////////////////////////////////       
-
-    // invariants   
-    //    
-
-    //////////////////////////////////////////////////
-    // REGISTER FOR
-    //////////////////////////////////////////////////        
-
-    // invariants   
-    //
+    /*
+        NOTES
+        - `trustedRegisterFor` tests handle the testing of the 
+          `_issueAndAdd()` function shared by all register txns,
+          which includes checks for migration cutoff, pausing, and 
+          custody/id invariants
+        - `registerFor()` tests confirm RiverRegistry is compatible with 6492 signatures
+           made with eoa/passkey signers from coinbase wallet factory. also tests that
+           expired signatures will revert
+    */ 
 
     //////////////////////////////////////////////////
     // TRUSTED REGISTER FOR
@@ -245,25 +248,406 @@ contract RiverRegistryTest is RiverRegistryTestSuite {
 
     // invariants
     // - only trusted - X
-    // - only for rids 201+ - x 
-    // - only if recipient has no id - x                 
-    // - fails if paused    
+    // - only for rids 201+ - X
+    // - only if recipient has no id - X                 
+    // - fails if paused - x    
     
     function test_trustedRegisterFor() public {
         // start prank as trusted caller
         vm.startPrank(trusted.addr);
 
-        // cache migration cutoff
-        uint256 cutoff = riverRegistry.RID_MIGRATION_CUTOFF();
-
         // process prep migration
-        _prepMigrateForAccounts(cutoff);
+        _prepMigrateForAccounts(riverRegistry.RID_MIGRATION_CUTOFF());
 
         address randomCustody = randomishAccount(uint256(keccak256(bytes("trustedRegisterFor"))));   
-        RiverRegistry.KeyInit[][] memory keyInits = generateKeyInits(1);   
+        IRiverRegistry.KeyInit[][] memory keyInits = generateKeyInits(1);   
 
-        riverRegistry.trustedRegisterFor();
+        uint256 issuedRid = riverRegistry.trustedRegisterFor(randomCustody, recovery.addr, keyInits[0]);
+        assertEq(riverRegistry.idCount(), 201);
+        assertEq(riverRegistry.idOf(randomCustody), issuedRid);
+        assertEq(riverRegistry.custodyOf(issuedRid), randomCustody);
+        assertEq(riverRegistry.hasMigrated(issuedRid), false);
+
+        IRiverRegistry.KeyData memory keyData = riverRegistry.keyDataOf(issuedRid, keyInits[0][0].key);        
+        assertEq(uint256(keyData.state), uint256(IRiverRegistry.KeyState.ADDED));
+        assertEq(keyData.keyType, 1);
+        bytes memory addedKey = riverRegistry.keyAt(issuedRid, IRiverRegistry.KeyState.ADDED, 0);
+        assertEq(addedKey, keyInits[0][0].key);
     }                
+
+    function test_revertOnlyTrusted_trustedRegisterFor() public {
+        // start prank as trusted caller
+        vm.startPrank(trusted.addr);
+
+        // process prep migration
+        _prepMigrateForAccounts(riverRegistry.RID_MIGRATION_CUTOFF());
+
+        vm.startPrank(malicious.addr);
+
+        address randomCustody = randomishAccount(uint256(keccak256(bytes("trustedRegisterFor"))));   
+        IRiverRegistry.KeyInit[][] memory keyInits = generateKeyInits(1);   
+
+        vm.expectRevert(abi.encodeWithSignature("Only_Trusted()"));
+        riverRegistry.trustedRegisterFor(randomCustody, recovery.addr, keyInits[0]);
+    }        
+
+    function test_revertBeforeMigrationCutoff_trustedRegisterFor() public {
+        // start prank as trusted caller
+        vm.startPrank(trusted.addr);
+
+        // process prep migration
+        _prepMigrateForAccounts(riverRegistry.RID_MIGRATION_CUTOFF() - 1);
+
+        address randomCustody = randomishAccount(uint256(keccak256(bytes("trustedRegisterFor"))));   
+        IRiverRegistry.KeyInit[][] memory keyInits = generateKeyInits(1);   
+
+        vm.expectRevert(abi.encodeWithSignature("Before_Migration_Cutoff()"));
+        riverRegistry.trustedRegisterFor(randomCustody, recovery.addr, keyInits[0]);
+    }         
+
+    function test_revertHasId_trustedRegisterFor() public {
+        // start prank as trusted caller
+        vm.startPrank(trusted.addr);
+
+        // process prep migration
+        _prepMigrateForAccounts(riverRegistry.RID_MIGRATION_CUTOFF());
+
+        // retrieve custody of rid 200
+        address custodyOfRid200 = riverRegistry.custodyOf(200);
+        IRiverRegistry.KeyInit[][] memory keyInits = generateKeyInits(1);   
+
+        vm.expectRevert(abi.encodeWithSignature("Has_Id()"));
+        riverRegistry.trustedRegisterFor(custodyOfRid200, recovery.addr, keyInits[0]);
+    }           
+
+    function test_revertPaused_trustedRegisterFor() public {
+        // start prank as trusted caller
+        vm.startPrank(trusted.addr);
+
+        // process prep migration
+        _prepMigrateForAccounts(riverRegistry.RID_MIGRATION_CUTOFF());
+
+        // pause contract
+        riverRegistry.pause();
+        assertEq(riverRegistry.paused(), true);
+
+        address randomCustody = randomishAccount(uint256(keccak256(bytes("trustedRegisterFor"))));   
+        IRiverRegistry.KeyInit[][] memory keyInits = generateKeyInits(1);     
+
+        vm.expectRevert(abi.encodeWithSignature("EnforcedPause()"));
+        riverRegistry.trustedRegisterFor(randomCustody, recovery.addr, keyInits[0]);
+    }              
+
+    //////////////////////////////////////////////////
+    // REGISTER
+    //////////////////////////////////////////////////       
+
+    // invariants   
+    // - only if allowance != 0 OR isPublic == true
+    // - only if msg.value = price
+
+    /* POSTIVE TESTS */
+
+    function test_isPublic_register() public {
+        // start prank as trusted caller
+        vm.startPrank(trusted.addr);
+
+        // process prep migration
+        _prepMigrateForAccounts(riverRegistry.RID_MIGRATION_CUTOFF());
+        // set registry to public
+        riverRegistry.toggleIsPublic();
+        assertEq(riverRegistry.isPublic(), true);
+
+        vm.stopPrank();
+        vm.startPrank(user.addr);
+        IRiverRegistry.KeyInit[][] memory keyInits = generateKeyInits(1);   
+
+        uint256 issuedRid = riverRegistry.register(recovery.addr, keyInits[0]);
+
+        assertEq(riverRegistry.idCount(), 201);
+        assertEq(riverRegistry.idOf(user.addr), issuedRid);
+        assertEq(riverRegistry.custodyOf(issuedRid), user.addr);
+    }      
+
+    function test_hasAllowance_register() public {
+        // start prank as trusted caller
+        vm.startPrank(trusted.addr);
+
+        // process prep migration
+        _prepMigrateForAccounts(riverRegistry.RID_MIGRATION_CUTOFF());
+        // give allowance to user
+        riverRegistry.increaseAllowance(user.addr, 1);
+        assertEq(riverRegistry.allowanceOf(user.addr), 1);
+
+        vm.stopPrank();
+        vm.startPrank(user.addr);
+        IRiverRegistry.KeyInit[][] memory keyInits = generateKeyInits(1);   
+
+        uint256 issuedRid = riverRegistry.register(recovery.addr, keyInits[0]);
+
+        assertEq(riverRegistry.idCount(), 201);
+        assertEq(riverRegistry.idOf(user.addr), issuedRid);
+        assertEq(riverRegistry.custodyOf(issuedRid), user.addr);
+        assertEq(riverRegistry.allowanceOf(user.addr), 0);
+    }          
+
+    function test_withPriceHasAllowance_register() public {
+        // start prank as trusted caller
+        vm.startPrank(trusted.addr);
+
+        // process prep migration
+        _prepMigrateForAccounts(riverRegistry.RID_MIGRATION_CUTOFF());
+        // set registry to public
+        riverRegistry.toggleIsPublic();        
+        // update price and deal ether to user
+        riverRegistry.setPrice(1 ether);
+        vm.deal(user.addr, 1 ether);
+
+        vm.stopPrank();
+        vm.startPrank(user.addr);
+        IRiverRegistry.KeyInit[][] memory keyInits = generateKeyInits(1);   
+
+        uint256 issuedRid = riverRegistry.register{value: 1 ether}(recovery.addr, keyInits[0]);
+
+        assertEq(riverRegistry.idCount(), 201);
+        assertEq(riverRegistry.idOf(user.addr), issuedRid);
+        assertEq(riverRegistry.custodyOf(issuedRid), user.addr);
+        assertEq(address(riverRegistry).balance, 1 ether);
+    }         
+
+    /* NEGATIVE TESTS */
+
+    function test_revertNotAllowed_register() public {
+        // start prank as trusted caller
+        vm.startPrank(trusted.addr);
+
+        // process prep migration
+        _prepMigrateForAccounts(riverRegistry.RID_MIGRATION_CUTOFF());
+        // not setting registry to public, or giving user allowance for revert  
+
+        vm.stopPrank();
+        vm.startPrank(user.addr);
+        IRiverRegistry.KeyInit[][] memory keyInits = generateKeyInits(1);   
+
+        vm.expectRevert(abi.encodeWithSignature("Not_Allowed()"));
+        riverRegistry.register(recovery.addr, keyInits[0]);
+    }       
+
+    function test_revertMsgValueIncorrect_hasAllowance_register() public {
+        // start prank as trusted caller
+        vm.startPrank(trusted.addr);
+
+        // process prep migration
+        _prepMigrateForAccounts(riverRegistry.RID_MIGRATION_CUTOFF());
+        // give allowance to user
+        riverRegistry.increaseAllowance(user.addr, 1);
+        // update price, deal to user
+        riverRegistry.setPrice(1 ether);
+        vm.deal(user.addr, 1.6 ether);
+
+        vm.stopPrank();
+        vm.startPrank(user.addr);
+        IRiverRegistry.KeyInit[][] memory keyInits = generateKeyInits(1);   
+
+        vm.expectRevert(abi.encodeWithSignature("Msg_Value_Incorrect()"));
+        // send insufficient funds (under or over)
+        riverRegistry.register{value: 0.5 ether}(recovery.addr, keyInits[0]);
+        // expect revert again sending too MUCH ether
+        vm.expectRevert(abi.encodeWithSignature("Msg_Value_Incorrect()"));
+        riverRegistry.register{value: 1.1 ether}(recovery.addr, keyInits[0]);
+    }     
+
+    function test_revertMsgValueIncorrect_isPublic_register() public {
+        // start prank as trusted caller
+        vm.startPrank(trusted.addr);
+
+        // process prep migration
+        _prepMigrateForAccounts(riverRegistry.RID_MIGRATION_CUTOFF());
+        // set registry to public
+        riverRegistry.toggleIsPublic();
+        // update price, deal to user
+        riverRegistry.setPrice(1 ether);
+        vm.deal(user.addr, 1.6 ether);
+
+        vm.stopPrank();
+        vm.startPrank(user.addr);
+        IRiverRegistry.KeyInit[][] memory keyInits = generateKeyInits(1);   
+
+        vm.expectRevert(abi.encodeWithSignature("Msg_Value_Incorrect()"));
+        // send insufficient funds (under or over)
+        riverRegistry.register{value: 0.5 ether}(recovery.addr, keyInits[0]);
+        // expect revert again sending too MUCH ether
+        vm.expectRevert(abi.encodeWithSignature("Msg_Value_Incorrect()"));
+        riverRegistry.register{value: 1.1 ether}(recovery.addr, keyInits[0]);
+    }         
+
+    //////////////////////////////////////////////////
+    // REGISTER FOR
+    //////////////////////////////////////////////////      
+
+    function test_isPublic_eoaRegisterFor() public {
+        // start prank as trusted caller
+        vm.startPrank(trusted.addr);
+
+        // process prep migration
+        _prepMigrateForAccounts(riverRegistry.RID_MIGRATION_CUTOFF());
+        // set registry to public
+        riverRegistry.toggleIsPublic();
+        assertEq(riverRegistry.isPublic(), true);
+
+        vm.stopPrank();
+        vm.startPrank(relayer.addr);
+        IRiverRegistry.KeyInit[][] memory keyInits = generateKeyInits(1);   
+
+        // generate signature for user
+        bytes memory sig = _signRegister(user.key, user.addr, recovery.addr, keyInits[0], _deadline());
+        uint256 issuedRid = riverRegistry.registerFor(user.addr, recovery.addr, keyInits[0], _deadline(), sig);
+
+        assertEq(riverRegistry.idCount(), 201);
+        assertEq(riverRegistry.idOf(user.addr), issuedRid);
+        assertEq(riverRegistry.custodyOf(issuedRid), user.addr);
+    }        
+
+    function test_isPublic_smartWalletEoaSignerRegisterFor() public {
+        // start prank as trusted caller
+        vm.startPrank(trusted.addr);
+
+        // process prep migration
+        _prepMigrateForAccounts(riverRegistry.RID_MIGRATION_CUTOFF());
+        // set registry to public
+        riverRegistry.toggleIsPublic();
+        assertEq(riverRegistry.isPublic(), true);
+
+        vm.stopPrank();
+        vm.startPrank(relayer.addr);
+        IRiverRegistry.KeyInit[][] memory keyInits = generateKeyInits(1);   
+
+        // deploy wallet, then generate signature for user
+        smartWallet = smartWalletFactory.createAccount(owners, nonce); 
+        assertGt(address(smartWallet).code.length, 0);
+        bytes memory sig = _prepareEoaSigForSmartWallet(smartWallet, user, recovery.addr, keyInits[0], _deadline());
+        uint256 issuedRid = riverRegistry.registerFor(address(smartWallet), recovery.addr, keyInits[0], _deadline(), sig);
+
+        assertEq(riverRegistry.idCount(), 201);
+        assertEq(riverRegistry.idOf(address(smartWallet)), issuedRid);
+        assertEq(riverRegistry.custodyOf(issuedRid), address(smartWallet));
+    }     
+
+    function test_isPublic_undeployedSmartWalletEoaSignerRegisterFor() public {
+        // start prank as trusted caller
+        vm.startPrank(trusted.addr);
+
+        // process prep migration
+        _prepMigrateForAccounts(riverRegistry.RID_MIGRATION_CUTOFF());
+        // set registry to public
+        riverRegistry.toggleIsPublic();
+        assertEq(riverRegistry.isPublic(), true);
+
+        vm.stopPrank();
+        vm.startPrank(relayer.addr);
+        IRiverRegistry.KeyInit[][] memory keyInits = generateKeyInits(1);   
+
+        // generate signature for user
+        assertEq(address(smartWallet).code.length, 0);      
+        (address undeployedSmartWallet, bytes memory sig) = _prepareEoa6492SigForSmartWallet(user, owners, recovery.addr, keyInits[0], _deadline());  
+        uint256 issuedRid = riverRegistry.registerFor(undeployedSmartWallet, recovery.addr, keyInits[0], _deadline(), sig);
+
+        assertEq(riverRegistry.idCount(), 201);
+        assertEq(riverRegistry.idOf(undeployedSmartWallet), issuedRid);
+        assertEq(riverRegistry.custodyOf(issuedRid), undeployedSmartWallet);
+    }         
+
+    function test_isPublic_smartWalletPasskeySignerRegisterFor() public {
+        // start prank as trusted caller
+        vm.startPrank(trusted.addr);
+
+        // process prep migration
+        _prepMigrateForAccounts(riverRegistry.RID_MIGRATION_CUTOFF());
+        // set registry to public
+        riverRegistry.toggleIsPublic();
+        assertEq(riverRegistry.isPublic(), true);
+
+        vm.stopPrank();
+        vm.startPrank(relayer.addr);
+        IRiverRegistry.KeyInit[][] memory keyInits = generateKeyInits(1);   
+
+        // deploy wallet, then generate signature for user
+        smartWallet = smartWalletFactory.createAccount(owners, nonce); 
+        assertGt(address(smartWallet).code.length, 0);
+        bytes memory sig = _preparePasskeySigForSmartWallet(smartWallet, recovery.addr, keyInits[0], _deadline());
+        uint256 issuedRid = riverRegistry.registerFor(address(smartWallet), recovery.addr, keyInits[0], _deadline(), sig);
+
+        assertEq(riverRegistry.idCount(), 201);
+        assertEq(riverRegistry.idOf(address(smartWallet)), issuedRid);
+        assertEq(riverRegistry.custodyOf(issuedRid), address(smartWallet));
+    }    
+
+    function test_isPublic_undeployedSmartWalletPasskeySignerRegisterFor() public {
+        // start prank as trusted caller
+        vm.startPrank(trusted.addr);
+
+        // process prep migration
+        _prepMigrateForAccounts(riverRegistry.RID_MIGRATION_CUTOFF());
+        // set registry to public
+        riverRegistry.toggleIsPublic();
+        assertEq(riverRegistry.isPublic(), true);
+
+        vm.stopPrank();
+        vm.startPrank(relayer.addr);
+        IRiverRegistry.KeyInit[][] memory keyInits = generateKeyInits(1);   
+
+        // generate signature for user
+        assertEq(address(smartWallet).code.length, 0);      
+        (address undeployedSmartWallet, bytes memory sig) = _preparePasskey6492SigForSmartWallet(owners, recovery.addr, keyInits[0], _deadline()); 
+        uint256 issuedRid = riverRegistry.registerFor(undeployedSmartWallet, recovery.addr, keyInits[0], _deadline(), sig);
+
+        assertEq(riverRegistry.idCount(), 201);
+        assertEq(riverRegistry.idOf(undeployedSmartWallet), issuedRid);
+        assertEq(riverRegistry.custodyOf(issuedRid), undeployedSmartWallet);
+    }        
+
+    function test_revertInvalidSignature_isPublic_eoaRegisterFor() public {
+        // start prank as trusted caller
+        vm.startPrank(trusted.addr);
+
+        // process prep migration
+        _prepMigrateForAccounts(riverRegistry.RID_MIGRATION_CUTOFF());
+        // set registry to public
+        riverRegistry.toggleIsPublic();
+        assertEq(riverRegistry.isPublic(), true);
+
+        vm.stopPrank();
+        vm.startPrank(relayer.addr);
+        IRiverRegistry.KeyInit[][] memory keyInits = generateKeyInits(1);   
+
+        // generate signature for user
+        bytes memory sig = _signRegister(user.key, user.addr, recovery.addr, keyInits[0], _deadline());
+        vm.expectRevert(abi.encodeWithSignature("Invalid_Signature()"));
+        riverRegistry.registerFor(user.addr, recovery.addr, keyInits[0], _deadline(), bytes.concat(sig, new bytes(3)));
+    }     
+
+    function test_revertSignatureExpired_isPublic_eoaRegisterFor() public {
+        // start prank as trusted caller
+        vm.startPrank(trusted.addr);
+
+        // process prep migration
+        _prepMigrateForAccounts(riverRegistry.RID_MIGRATION_CUTOFF());
+        // set registry to public
+        riverRegistry.toggleIsPublic();
+        assertEq(riverRegistry.isPublic(), true);
+
+        vm.stopPrank();
+        vm.startPrank(relayer.addr);
+        IRiverRegistry.KeyInit[][] memory keyInits = generateKeyInits(1);   
+
+        // generate signature for user
+        uint256 deadline = _deadline();
+        bytes memory sig = _signRegister(user.key, user.addr, recovery.addr, keyInits[0], deadline);
+        // jump into the future, so that block.timestamp > deadline, making signature expired
+        vm.warp(deadline + 100);
+        vm.expectRevert(abi.encodeWithSignature("Signature_Expired()"));
+        riverRegistry.registerFor(user.addr, recovery.addr, keyInits[0], deadline, sig);
+    }       
 
     /* * * * * * * * * * * * * * * * * * * * * * * * *
     *                                                *
@@ -347,10 +731,6 @@ contract RiverRegistryTest is RiverRegistryTestSuite {
     // ??? TRUSTED REMOVE FOR 
     //////////////////////////////////////////////////                      
 
-    //////////////////////////////////////////////////
-    // KEY MGMT - Add, Remove, Reset
-    //////////////////////////////////////////////////    
-
     /* * * * * * * * * * * * * * * * * * * * * * * * *
     *                                                *
     *                                                *
@@ -366,7 +746,7 @@ contract RiverRegistryTest is RiverRegistryTestSuite {
     /* * * * * * * * * * * * * * * * * * * * * * * * *
     *                                                *
     *                                                *
-    *          PAUSING + ALLOWLIST + PUBLIC          *
+    *                   BUSINESS                     *
     *                                                *
     *                                                *
     * * * * * * * * * * * * * * * * * * * * * * * * */  
@@ -375,4 +755,15 @@ contract RiverRegistryTest is RiverRegistryTestSuite {
     // public registrations on/off, settable by onlyTrusted
     // make these payable? to a recipient we can set? and we can upate the price?
     // allowlist registrations from beginning, settable by onlyTrusted
+
+    /* * * * * * * * * * * * * * * * * * * * * * * * *
+    *                                                *
+    *                                                *
+    *                     MISC                       *
+    *                                                *
+    *                                                *
+    * * * * * * * * * * * * * * * * * * * * * * * * */      
+
+    // Make sure that migrations (1-200) can keep happening indefinitely,
+    // even as idCount progresses past the cutoff
 }
