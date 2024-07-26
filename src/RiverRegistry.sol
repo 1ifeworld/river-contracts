@@ -5,13 +5,15 @@ import {Pausable} from "@openzeppelin/utils/Pausable.sol";
 import {IRiverRegistry} from "./interfaces/IRiverRegistry.sol";
 import {EnumerableKeySet, KeySet} from "./libraries/EnumerableKeySet.sol";
 import {Business} from "./abstract/Business.sol";
-import {Nonces} from "./abstract/Nonces.sol";
 import {EIP712} from "./abstract/EIP712.sol";
+import {Nonces} from "./abstract/Nonces.sol";
 import {Signatures} from "./abstract/Signatures.sol";
 
 /**
  * @title RiverRegistry
+ *
  * @author Lifeworld
+ *
  * @custom:security-contact devops@lifeworld.co
  */
 contract RiverRegistry is IRiverRegistry, Business, Pausable, Nonces, Signatures, EIP712 {
@@ -26,10 +28,29 @@ contract RiverRegistry is IRiverRegistry, Business, Pausable, Nonces, Signatures
     * * * * * * * * * * * * * * * * * * * * * * * * */  
 
     string public constant NAME = "RiverRegistry";
+
     string public constant VERSION = "2024.08.22";
+
     bytes32 public constant REGISTER_TYPEHASH = 
-        keccak256("Register(address to,address recovery,KeyData[] keys,uint256 nonce,uint256 deadline)");     
+        keccak256("Register(address to,address recovery,KeyData[] keys,uint256 nonce,uint256 deadline)");  
+
+    bytes32 public constant TRANSFER_TYPEHASH =
+        keccak256("Transfer(uint256 rid,address to,uint256 nonce,uint256 deadline)");        
+
+    bytes32 public constant TRANSFER_AND_CHANGE_RECOVERY_TYPEHASH =
+        keccak256("TransferAndChangeRecovery(uint256 rid,address to,address recovery,uint256 nonce,uint256 deadline)");
+
+    bytes32 public constant CHANGE_RECOVERY_ADDRESS_TYPEHASH =
+        keccak256("ChangeRecoveryAddress(uint256 rid,address from,address to,uint256 nonce,uint256 deadline)");        
+
+    bytes32 public constant ADD_TYPEHASH =
+        keccak256("Remove(address owner,uint32 keyType,bytes key,uint256 nonce,uint256 deadline)");
+
+    bytes32 public constant REMOVE_TYPEHASH =
+        keccak256("Remove(address owner,bytes key,uint256 nonce,uint256 deadline)");        
+
     uint256 public constant MAX_KEYS_PER_RID = 500;
+
     uint256 public constant RID_MIGRATION_CUTOFF = 200;
 
     /* * * * * * * * * * * * * * * * * * * * * * * * *
@@ -222,8 +243,49 @@ contract RiverRegistry is IRiverRegistry, Business, Pausable, Nonces, Signatures
     // TRANSFER
     //////////////////////////////////////////////////      
 
-    // transfer()
-    // transferFor()
+    /***
+    
+            DO THINKING ABOUT WHAT THE TRUST AND PAUSE MODELS SHOULD BE HERE
+    
+     */    
+
+    function transfer(address to, uint256 deadline, bytes calldata sig) external {
+        address from = msg.sender;
+        uint256 fromId = idOf[from];
+
+        // Revert if the sender has no id
+        if (fromId == 0) revert Has_No_Id();
+        // Revert if recipient has an id
+        if (idOf[to] != 0) revert Has_Id();
+
+        // Revert if signature is invalid
+        _verifyTransferSig({rid: fromId, to: to, deadline: deadline, signer: to, sig: sig});
+
+        _unsafeTransfer(fromId, from, to);
+    }
+
+    function transferFor(
+        address from,
+        address to,
+        uint256 fromDeadline,
+        bytes calldata fromSig,
+        uint256 toDeadline,
+        bytes calldata toSig
+    ) external {
+        uint256 fromId = idOf[from];
+
+        // Revert if the sender has no id
+        if (fromId == 0) revert Has_No_Id();
+        // Revert if recipient has an id
+        if (idOf[to] != 0) revert Has_Id();
+
+        // Revert if either signature is invalid
+        _verifyTransferSig({rid: fromId, to: to, deadline: fromDeadline, signer: from, sig: fromSig});
+        _verifyTransferSig({rid: fromId, to: to, deadline: toDeadline, signer: to, sig: toSig});        
+
+        _unsafeTransfer(fromId, from, to);
+    }
+
 
     /**
      * @dev Retrieve rid and validate sender/recipient
@@ -253,9 +315,88 @@ contract RiverRegistry is IRiverRegistry, Business, Pausable, Nonces, Signatures
     // RECOVER
     //////////////////////////////////////////////////      
 
-    // changeRecoveryAddress()
-    // recover()
-    // recoverFor()
+    /***
+    
+            DO THINKING ABOUT WHAT THE TRUST AND PAUSE MODELS SHOULD BE HERE
+    
+     */
+
+    function changeRecoveryAddress(address recovery) external onlyTrusted whenNotPaused {
+        // Revert if the caller does not own an rid
+        uint256 ownerId = idOf[msg.sender];
+        if (ownerId == 0) revert Has_No_Id();
+
+        // Change the recovery address
+        recoveryOf[ownerId] = recovery;
+
+        emit ChangeRecoveryAddress(ownerId, recovery);
+    }
+
+    function changeRecoveryAddressFor(
+        address owner,
+        address recovery,
+        uint256 deadline,
+        bytes calldata sig
+    ) external whenNotPaused {
+        // Revert if the caller does not own an rid
+        uint256 ownerId = idOf[owner];
+        if (ownerId == 0) revert Has_No_Id();
+
+        _verifyChangeRecoverySig({rid: ownerId, recovery: recovery, deadline: deadline, signer: owner, sig: sig});
+
+        // Change the recovery address
+        recoveryOf[ownerId] = recovery;
+
+        emit ChangeRecoveryAddress(ownerId, recovery);
+    }
+
+    function recover(address from, address to, uint256 deadline, bytes calldata sig) external {
+        // Revert if from does not own an rid
+        uint256 fromId = idOf[from];
+        if (fromId == 0) revert Has_No_Id();
+
+        // Revert if the caller is not the recovery address
+        address caller = msg.sender;
+        if (recoveryOf[fromId] != caller) revert Unauthorized();
+
+        // Revert if destination(to) already has an rid
+        if (idOf[to] != 0) revert Has_Id();
+
+        // Revert if signature is invalid
+        _verifyTransferSig({rid: fromId, to: to, deadline: deadline, signer: to, sig: sig});
+
+        emit Recover(from, to, fromId);
+        _unsafeTransfer(fromId, from, to);
+    }
+
+    function recoverFor(
+        address from,
+        address to,
+        uint256 recoveryDeadline,
+        bytes calldata recoverySig,
+        uint256 toDeadline,
+        bytes calldata toSig
+    ) external {
+        // Revert if from does not own an rid
+        uint256 fromId = idOf[from];
+        if (fromId == 0) revert Has_No_Id();
+
+        // Revert if destination(to) already has an rid
+        if (idOf[to] != 0) revert Has_Id();
+
+        // Revert if either signature is invalid
+        _verifyTransferSig({
+            rid: fromId,
+            to: to,
+            deadline: recoveryDeadline,
+            signer: recoveryOf[fromId],
+            sig: recoverySig
+        });
+        _verifyTransferSig({rid: fromId, to: to, deadline: toDeadline, signer: to, sig: toSig});
+
+        emit Recover(from, to, fromId);
+        _unsafeTransfer(fromId, from, to);
+    }
 
     /**
      * @dev Change recovery address without checking invariants.
@@ -272,9 +413,38 @@ contract RiverRegistry is IRiverRegistry, Business, Pausable, Nonces, Signatures
     // ADD KEY
     ////////////////////////////////////////////////////////////////   
 
-    // add()
-    // addFor()
-    // trustedAddFor() ???
+    /**
+     * @dev No signature checks performed
+     * @dev Only callable by trusted caller
+     */
+    function trustedAddFor(
+        address ridOwner,
+        uint32 keyType,
+        bytes calldata key
+    ) external onlyTrusted {
+        _add(_ridOf(ridOwner), keyType, key);
+    }   
+
+    // No isAllowed check hear on purpose
+    function add(
+        uint32 keyType,
+        bytes calldata key
+    ) external {
+        _add(_ridOf(msg.sender), keyType, key);
+    }
+
+    // No isAllowed check hear on purpose
+    function addFor(
+        address ridOwner,
+        uint32 keyType,
+        bytes calldata key,
+        uint256 deadline,
+        bytes calldata sig
+    ) external {
+        // Revert if signature invalid
+        _verifyAddSig(ridOwner, keyType, key, deadline, sig);
+        _add(_ridOf(ridOwner), keyType, key);
+    }        
 
     /**
      * @dev fill in
@@ -285,8 +455,8 @@ contract RiverRegistry is IRiverRegistry, Business, Pausable, Nonces, Signatures
         bytes calldata key
     ) internal whenNotPaused {
         KeyData storage keyData = keys[rid][key];
-        if (keyData.state != KeyState.NULL) revert InvalidState();
-        if (totalKeys(rid, KeyState.ADDED) >= MAX_KEYS_PER_RID) revert ExceedsMaximum();
+        if (keyData.state != KeyState.NULL) revert Invalid_Key_State();
+        if (totalKeys(rid, KeyState.ADDED) >= MAX_KEYS_PER_RID) revert Exceeds_Maximum();
 
         _addToKeySet(rid, key);
         keyData.state = KeyState.ADDED;
@@ -306,9 +476,28 @@ contract RiverRegistry is IRiverRegistry, Business, Pausable, Nonces, Signatures
     // REMOVE KEY
     //////////////////////////////////////////////////          
 
-    // remove()
-    // removeFor()
-    // _remove() - this should have whenNotPaused modifier, and calls _removeFromKeySet
+    function remove(bytes calldata key) external {
+        _remove(_ridOf(msg.sender), key);
+    }    
+
+    function removeFor(
+        address ridOwner,
+        bytes calldata key,
+        uint256 deadline,
+        bytes calldata sig
+    ) external  {
+        _verifyRemoveSig(ridOwner, key, deadline, sig);
+        _remove(_ridOf(ridOwner), key);
+    }    
+
+    function _remove(uint256 rid, bytes calldata key) internal whenNotPaused {
+        KeyData storage keyData = keys[rid][key];
+        if (keyData.state != KeyState.ADDED) revert Invalid_Key_State();
+
+        _removeFromKeySet(rid, key);
+        keyData.state = KeyState.REMOVED;
+        emit Remove(rid, key, key);
+    }   
 
     /**
      * @dev fill in
@@ -320,9 +509,24 @@ contract RiverRegistry is IRiverRegistry, Business, Pausable, Nonces, Signatures
                             
     ////////////////////////////////////////////////////////////////
     // VIEWS
-    ////////////////////////////////////////////////////////////////        
+    ////////////////////////////////////////////////////////////////   
 
-    // isValidSignatureForRid() ???
+    //      
+
+    function verifyRidSignature(
+        address custodyAddress,
+        uint256 rid,
+        bytes32 digest,
+        bytes calldata sig
+    ) external returns (bool isValid) {
+        _verifySig(digest, custodyAddress, sig);
+        isValid = idOf[custodyAddress] == rid;
+    }
+
+    function _ridOf(address ridOwner) internal view returns (uint256 rid) {
+        rid = idOf[ridOwner];
+        if (rid == 0) revert Unauthorized();
+    }
 
     function totalKeys(uint256 rid, KeyState state) public view virtual returns (uint256) {
         return _keysByState(rid, state).length();
@@ -373,7 +577,7 @@ contract RiverRegistry is IRiverRegistry, Business, Pausable, Nonces, Signatures
         } else if (state == KeyState.REMOVED) {
             return _removedKeysByRid[rid];
         } else {
-            revert InvalidState();
+            revert Invalid_Key_State();
         }
     }    
         
@@ -401,17 +605,68 @@ contract RiverRegistry is IRiverRegistry, Business, Pausable, Nonces, Signatures
     *                                                *
     * * * * * * * * * * * * * * * * * * * * * * * * */  
 
-    // verifyTransferSig()
-    // verifyRecoverSig()
-    // verifyAddSig()
-    // verifyRemoveSig()
-
-    function _verifyRegisterSig(address to, address recovery, KeyInit[] calldata keyInits, uint256 deadline, bytes memory sig) internal {
+    function _verifyRegisterSig(address owner, address recovery, KeyInit[] calldata keyInits, uint256 deadline, bytes memory sig) internal {
         _verifySigWithDeadline(
-            _hashTypedDataV4(keccak256(abi.encode(REGISTER_TYPEHASH, to, recovery, keyInits, _useNonce(to), deadline))),
-            to,
+            _hashTypedDataV4(keccak256(abi.encode(REGISTER_TYPEHASH, owner, recovery, keyInits, _useNonce(owner), deadline))),
+            owner,
             deadline,
             sig
         );
     }        
+
+    function _verifyTransferSig(uint256 rid, address signer, uint256 deadline, address to, bytes memory sig) internal {
+        _verifySigWithDeadline(
+            _hashTypedDataV4(keccak256(abi.encode(TRANSFER_TYPEHASH, rid, to, _useNonce(signer), deadline))),
+            signer,
+            deadline,
+            sig
+        );
+    }
+
+    function _verifyTransferAndChangeRecoverySig(
+        uint256 rid,
+        address owner,
+        address to,
+        address recovery,
+        uint256 deadline,    
+        bytes memory sig
+    ) internal {
+        _verifySigWithDeadline(
+            _hashTypedDataV4(
+                keccak256(
+                    abi.encode(TRANSFER_AND_CHANGE_RECOVERY_TYPEHASH, rid, to, recovery, _useNonce(owner), deadline)
+                )
+            ),
+            owner,
+            deadline,
+            sig
+        );
+    }    
+
+    function _verifyChangeRecoverySig(uint256 rid, address signer, address recovery, uint256 deadline, bytes memory sig) internal {
+        _verifySigWithDeadline(
+            _hashTypedDataV4(keccak256(abi.encode(CHANGE_RECOVERY_ADDRESS_TYPEHASH, rid, signer, recovery, _useNonce(signer), deadline))),
+            signer,
+            deadline,
+            sig
+        );
+    }            
+
+    function _verifyAddSig(address owner, uint32 keyType, bytes calldata key, uint256 deadline, bytes memory sig) internal {
+        _verifySigWithDeadline(
+            _hashTypedDataV4(keccak256(abi.encode(ADD_TYPEHASH, owner, keyType, key, _useNonce(owner), deadline))),
+            owner,
+            deadline,
+            sig
+        );
+    }     
+
+    function _verifyRemoveSig(address owner, bytes calldata key, uint256 deadline, bytes memory sig) internal {
+        _verifySigWithDeadline(
+            _hashTypedDataV4(keccak256(abi.encode(REMOVE_TYPEHASH, owner, key, _useNonce(owner), deadline))),
+            owner,
+            deadline,
+            sig
+        );
+    }         
 }

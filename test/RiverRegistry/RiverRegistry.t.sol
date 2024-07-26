@@ -16,11 +16,7 @@ contract RiverRegistryTest is RiverRegistryTestSuite {
 
     /*
         WIP notes
-        - add checks to migrateFor to make sure old storage is cleareds
-        - add in pause checks for everything
-        - add in event tests for everything
-        -
-
+        - 
     */
 
     /* * * * * * * * * * * * * * * * * * * * * * * * *
@@ -51,7 +47,7 @@ contract RiverRegistryTest is RiverRegistryTestSuite {
         _prepMigrateForAccounts(cutoff);
 
         assertEq(riverRegistry.idCount(), cutoff);
-    }
+    }  
 
     function test_revertOnlyTrusted_prepMigrate() public {
         // start prank as untrusted caller
@@ -104,8 +100,10 @@ contract RiverRegistryTest is RiverRegistryTestSuite {
         RiverRegistry.KeyInit[][] memory keyInits = generateKeyInits(cutoff);    
         for (uint256 i; i < cutoff; ++i) {
             address randomAccount2 = randomishAccount(cutoff + i);
+            address fromCustody = riverRegistry.custodyOf(i + 1);
             riverRegistry.trustedMigrateFor(i + 1, randomAccount2, recovery.addr, keyInits[i]);            
             assertEq(riverRegistry.idOf(randomAccount2), i + 1);
+            assertEq(riverRegistry.idOf(fromCustody), 0);
             assertEq(riverRegistry.custodyOf(i + 1), randomAccount2);
             assertEq(riverRegistry.recoveryOf(i + 1), recovery.addr);
             assertEq(riverRegistry.hasMigrated(i + 1), true);

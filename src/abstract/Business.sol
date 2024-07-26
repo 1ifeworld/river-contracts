@@ -82,6 +82,16 @@ abstract contract Business is Trust {
         status = isPublic = !isPublic;
     }
 
+    function isAllowed(address account) onlyTrusted external view returns (bool status) {
+        status = isPublic || allowanceOf[account] != 0 ? true : false;
+    }    
+
+    function _isAllowed(address account) internal view {
+        if (!isPublic) {
+            if (allowanceOf[account] == 0) revert Not_Allowed();
+        }        
+    }    
+
     function increaseAllowance(address account, uint256 increase) onlyTrusted external returns (uint256 newAllowance) {
         newAllowance = allowanceOf[account] += increase;
         emit Allowance(account, newAllowance);
@@ -93,17 +103,11 @@ abstract contract Business is Trust {
         emit Allowance(account, 0);
     }
 
-    // only called when `isPublic` == false
+    // @dev can be called by anyone. enforce checks elsewhere
     function _unsafeDecreaseAllowance(address account) internal {
         uint256 newAllowance = --allowanceOf[account];
         emit Allowance(account, newAllowance);
     }             
-
-    function _isAllowed(address account) internal view {
-        if (!isPublic) {
-            if (allowanceOf[account] == 0) revert Not_Allowed();
-        }        
-    }
 
     /* * * * * * * * * * * * * * * * * * * * * * * * *
     *                                                *
