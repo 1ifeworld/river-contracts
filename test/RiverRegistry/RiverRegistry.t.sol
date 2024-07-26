@@ -14,23 +14,18 @@ import "./RiverRegistryTestSuite.sol";
 
 contract RiverRegistryTest is RiverRegistryTestSuite {       
 
-    // other cases
-    // - NOTE: handle this in the register tests: should work for rids 1-200 even once other ids are being registered via normal register post 200    
-
-
-    /*                                               *
+    /* * * * * * * * * * * * * * * * * * * * * * * * *
     *                                                *
     *                                                *
     *                ID MIGRATION                    *
     *                                                *
     *                                                *
-    *                                               */
+    * * * * * * * * * * * * * * * * * * * * * * * * */
 
     //////////////////////////////////////////////////
     // TRUSTED PREP MIGRATION
     //////////////////////////////////////////////////        
 
-    
     // invariants
     // - only trusted - X
     // - only for rids 1-200 - x 
@@ -97,7 +92,7 @@ contract RiverRegistryTest is RiverRegistryTestSuite {
         _prepMigrateForAccounts(cutoff);
 
         // process 200 migrations and run tests
-        RiverRegistry.KeyRegistration[][] memory keyInits = generateKeyInits(cutoff);    
+        RiverRegistry.KeyInit[][] memory keyInits = generateKeyInits(cutoff);    
         for (uint256 i; i < cutoff; ++i) {
             address randomAccount2 = randomishAccount(cutoff + i);
             riverRegistry.trustedMigrateFor(i + 1, randomAccount2, recovery.addr, keyInits[i]);            
@@ -122,7 +117,7 @@ contract RiverRegistryTest is RiverRegistryTestSuite {
         vm.startPrank(malicious.addr);
 
         // process 200 migrations and run tests
-        RiverRegistry.KeyRegistration[][] memory keyInits = generateKeyInits(cutoff);    
+        RiverRegistry.KeyInit[][] memory keyInits = generateKeyInits(cutoff);    
         for (uint256 i; i < cutoff; ++i) {
             address randomAccount2 = randomishAccount(cutoff + i);
             vm.expectRevert(abi.encodeWithSignature("Only_Trusted()"));
@@ -141,7 +136,7 @@ contract RiverRegistryTest is RiverRegistryTestSuite {
         _prepMigrateForAccounts(cutoff);
 
         // process 200 migrations and run tests
-        RiverRegistry.KeyRegistration[][] memory keyInits = generateKeyInits(cutoff + 1);    
+        RiverRegistry.KeyInit[][] memory keyInits = generateKeyInits(cutoff + 1);    
         for (uint256 i; i < cutoff + 1; ++i) {
             address randomAccount2 = randomishAccount(cutoff + i);
             if (i == cutoff) {
@@ -163,7 +158,7 @@ contract RiverRegistryTest is RiverRegistryTestSuite {
         _prepMigrateForAccounts(cutoff);
 
         // process 200 migrations and run tests
-        RiverRegistry.KeyRegistration[][] memory keyInits = generateKeyInits(cutoff);    
+        RiverRegistry.KeyInit[][] memory keyInits = generateKeyInits(cutoff);    
         for (uint256 i; i < cutoff; ++i) {
             address randomAccount2 = randomishAccount(cutoff + i);            
             riverRegistry.trustedMigrateFor(i + 1, randomAccount2, recovery.addr, keyInits[i]);
@@ -184,7 +179,7 @@ contract RiverRegistryTest is RiverRegistryTestSuite {
         // not prepping migration for revert
 
         // process 200 migrations and run tests
-        RiverRegistry.KeyRegistration[][] memory keyInits = generateKeyInits(cutoff);    
+        RiverRegistry.KeyInit[][] memory keyInits = generateKeyInits(cutoff);    
         for (uint256 i; i < cutoff; ++i) {
             address randomAccount2 = randomishAccount(cutoff + i);            
             // vm.expectRevert(abi.encodeWithSignature("Only_Trusted()"));
@@ -204,7 +199,7 @@ contract RiverRegistryTest is RiverRegistryTestSuite {
         _prepMigrateForAccounts(cutoff);
 
         // process 200 migrations and run tests
-        RiverRegistry.KeyRegistration[][] memory keyInits = generateKeyInits(cutoff);    
+        RiverRegistry.KeyInit[][] memory keyInits = generateKeyInits(cutoff);    
         for (uint256 i; i < cutoff; ++i) {
             address randomAccount2 = randomishAccount(cutoff + i);            
 
@@ -219,33 +214,64 @@ contract RiverRegistryTest is RiverRegistryTestSuite {
         }        
     }        
 
-    /*                                               *
+    /* * * * * * * * * * * * * * * * * * * * * * * * *
     *                                                *
     *                                                *
     *               ID REGISTRATION                  *
     *                                                *
     *                                                *
-    *                                               */
+    * * * * * * * * * * * * * * * * * * * * * * * * */
+
+    // other cases
+    // - NOTE: handle this in the register tests: should work for rids 1-200 even once other ids are being registered via normal register post 200      
 
     //////////////////////////////////////////////////
     // REGISTER
     //////////////////////////////////////////////////       
 
+    // invariants   
+    //    
+
     //////////////////////////////////////////////////
     // REGISTER FOR
-    //////////////////////////////////////////////////           
+    //////////////////////////////////////////////////        
+
+    // invariants   
+    //
 
     //////////////////////////////////////////////////
     // TRUSTED REGISTER FOR
-    //////////////////////////////////////////////////               
+    ////////////////////////////////////////////////// 
 
-    /*                                               *
+    // invariants
+    // - only trusted - X
+    // - only for rids 201+ - x 
+    // - only if recipient has no id - x                 
+    // - fails if paused    
+    
+    function test_trustedRegisterFor() public {
+        // start prank as trusted caller
+        vm.startPrank(trusted.addr);
+
+        // cache migration cutoff
+        uint256 cutoff = riverRegistry.RID_MIGRATION_CUTOFF();
+
+        // process prep migration
+        _prepMigrateForAccounts(cutoff);
+
+        address randomCustody = randomishAccount(uint256(keccak256(bytes("trustedRegisterFor"))));   
+        RiverRegistry.KeyInit[][] memory keyInits = generateKeyInits(1);   
+
+        riverRegistry.trustedRegisterFor();
+    }                
+
+    /* * * * * * * * * * * * * * * * * * * * * * * * *
     *                                                *
     *                                                *
     *                 ID TRANSFERS                   *
     *                                                *
     *                                                *
-    *                                               */
+    * * * * * * * * * * * * * * * * * * * * * * * * */
 
     //////////////////////////////////////////////////
     // TRANSFER
@@ -259,13 +285,13 @@ contract RiverRegistryTest is RiverRegistryTestSuite {
     // TRANSFER AND CHANGE RECOVERY ????
     //////////////////////////////////////////////////          
 
-    /*                                               *
+    /* * * * * * * * * * * * * * * * * * * * * * * * *
     *                                                *
     *                                                *
     *                 ID RECOVERY                    *
     *                                                *
     *                                                *
-    *                                               */
+    * * * * * * * * * * * * * * * * * * * * * * * * */
     
     //////////////////////////////////////////////////
     // RECOVER
@@ -279,13 +305,13 @@ contract RiverRegistryTest is RiverRegistryTestSuite {
     // CHANGE RECOVERY
     //////////////////////////////////////////////////              
 
-    /*                                               *
+    /* * * * * * * * * * * * * * * * * * * * * * * * *
     *                                                *
     *                                                *
     *                  KEY ADD                       *
     *                                                *
     *                                                *
-    *                                               */   
+    * * * * * * * * * * * * * * * * * * * * * * * * */  
 
     //////////////////////////////////////////////////
     // ADD
@@ -301,13 +327,13 @@ contract RiverRegistryTest is RiverRegistryTestSuite {
 
     // is this bad vibes 0_0
 
-    /*                                               *
+    /* * * * * * * * * * * * * * * * * * * * * * * * *
     *                                                *
     *                                                *
     *               KEY REMOVAL                      *
     *                                                *
     *                                                *
-    *                                               */        
+    * * * * * * * * * * * * * * * * * * * * * * * * */  
 
     //////////////////////////////////////////////////
     // REMOVE
@@ -325,25 +351,25 @@ contract RiverRegistryTest is RiverRegistryTestSuite {
     // KEY MGMT - Add, Remove, Reset
     //////////////////////////////////////////////////    
 
-    /*                                               *
+    /* * * * * * * * * * * * * * * * * * * * * * * * *
     *                                                *
     *                                                *
     *                    VIEWS                       *
     *                                                *
     *                                                *
-    *                                               */
+    * * * * * * * * * * * * * * * * * * * * * * * * */
 
     //////////////////////////////////////////////////
     // IS VALID SIGNATURE
     //////////////////////////////////////////////////              
 
-    /*                                               *
+    /* * * * * * * * * * * * * * * * * * * * * * * * *
     *                                                *
     *                                                *
     *          PAUSING + ALLOWLIST + PUBLIC          *
     *                                                *
     *                                                *
-    *                                               */    
+    * * * * * * * * * * * * * * * * * * * * * * * * */  
 
     // functionality to add 
     // public registrations on/off, settable by onlyTrusted

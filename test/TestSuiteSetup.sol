@@ -31,6 +31,7 @@ abstract contract TestSuiteSetup is Test {
     //////////////////////////////////////////////////////////////*/    
 
     Account public trusted = makeAccount("trusted");
+    Account public payout = makeAccount("payout");
     Account public recovery = makeAccount("recovery");
     Account public relayer = makeAccount("relayer");
     Account public user = makeAccount("user");

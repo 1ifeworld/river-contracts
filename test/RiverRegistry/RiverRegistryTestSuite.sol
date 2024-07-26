@@ -7,6 +7,7 @@ import {CoinbaseSmartWalletFactory} from "@smart-wallet/CoinbaseSmartWalletFacto
 import {WebAuthn} from "@webauthn-sol/src/WebAuthn.sol";
 import "@webauthn-sol/test/Utils.sol";
 import {RiverRegistry} from "../../src/RiverRegistry.sol";
+import {IRiverRegistry} from "../../src/interfaces/IRiverRegistry.sol";
 import {TestSuiteSetup} from "../TestSuiteSetup.sol";
 
 abstract contract RiverRegistryTestSuite is TestSuiteSetup {
@@ -17,7 +18,7 @@ abstract contract RiverRegistryTestSuite is TestSuiteSetup {
         super.setUp();
         trustedCallers = new address[](1);
         trustedCallers[0] = relayer.addr;
-        riverRegistry = new RiverRegistry(trusted.addr, trustedCallers);
+        riverRegistry = new RiverRegistry(trusted.addr, trustedCallers, payout.addr, 0);
     }
 
     //////////////////////////////////////////////////
@@ -29,11 +30,11 @@ abstract contract RiverRegistryTestSuite is TestSuiteSetup {
         return address(uint160(uint256(hash)));
     }  
 
-    function generateKeyInits(uint256 numKeys) public returns (RiverRegistry.KeyRegistration[][] memory) {
-        RiverRegistry.KeyRegistration[][] memory keys = new RiverRegistry.KeyRegistration[][](numKeys);
+    function generateKeyInits(uint256 numKeys) public pure returns (IRiverRegistry.KeyInit[][] memory) {
+        IRiverRegistry.KeyInit[][] memory keys = new IRiverRegistry.KeyInit[][](numKeys);
         for (uint256 i; i < numKeys; ++i) {
-            RiverRegistry.KeyRegistration[] memory init = new RiverRegistry.KeyRegistration[](1);
-            init[0] = RiverRegistry.KeyRegistration({
+            IRiverRegistry.KeyInit[] memory init = new IRiverRegistry.KeyInit[](1);
+            init[0] = IRiverRegistry.KeyInit({
                 keyType: 1,
                 key: new bytes(i)
             });

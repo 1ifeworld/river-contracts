@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.23;
 
+import {IRiverRegistry} from "./interfaces/IRiverRegistry.sol";
 import {EnumerableKeySet, KeySet} from "./libraries/EnumerableKeySet.sol";
-import {Trust} from "./abstract/Trust.sol";
+import {Business} from "./abstract/Business.sol";
 import {Nonces} from "./abstract/Nonces.sol";
 import {EIP712} from "./abstract/EIP712.sol";
 import {Signatures} from "./abstract/Signatures.sol";
@@ -10,69 +11,16 @@ import {Signatures} from "./abstract/Signatures.sol";
 /**
  * @title RiverRegistry
  */
-contract RiverRegistry is Trust, Nonces, EIP712 {
+contract RiverRegistry is IRiverRegistry, Business, Nonces, Signatures, EIP712 {
     using EnumerableKeySet for KeySet;
-    
-    ////////////////////////////////////////////////////////////////
-    // ERRORS (move these into interface later)
-    ////////////////////////////////////////////////////////////////       
 
-    error Past_Migration_Cutoff();
-    error Already_Migrated();
-    error Has_No_Id();
-    error Has_Id();
-    //
-    error ExceedsMaximum();
-    error ValidatorNotFound(uint32 keyType, uint8 metadataType);
-    error InvalidState();
-
-    ////////////////////////////////////////////////////////////////
-    // EVENTS (move these into interface later)
-    ////////////////////////////////////////////////////////////////  
-
-    event Register(address indexed to, uint256 id, address recovery);    
-    event Transfer(address indexed from, address indexed to, uint256 indexed id);
-    event Add(
-        uint256 indexed rid,
-        uint32 indexed keyType,
-        bytes indexed key,
-        bytes keyBytes
-    );
-    event Migrate(uint256 indexed id);    
-    event ChangeRecoveryAddress(uint256 indexed id, address indexed recovery);
-
-    ////////////////////////////////////////////////////////////////
-    // TYPES (move these into interface later)
-    ////////////////////////////////////////////////////////////////    
-
-    enum KeyState {
-        NULL,
-        ADDED,
-        REMOVED
-    }
-
-    struct KeyData {
-        KeyState state;
-        uint32 keyType;
-    }
-
-    struct KeyRegistration {
-        uint32 keyType;
-        bytes key;
-    }
-
-    /* NOTE: currently not in use */
-    struct RegistrationParams {
-        address to;
-        address recovery;
-        KeyRegistration[] keys;
-        uint256 deadline;
-        bytes sig;
-    }    
-    
-    ////////////////////////////////////////////////////////////////
-    // CONSTANTS
-    ////////////////////////////////////////////////////////////////
+    /* * * * * * * * * * * * * * * * * * * * * * * * *
+    *                                                *
+    *                                                *
+    *                  CONSTANTS                     *
+    *                                                *
+    *                                                *
+    * * * * * * * * * * * * * * * * * * * * * * * * */  
 
     string public constant NAME = "RiverRegistry";
 
@@ -85,30 +33,46 @@ contract RiverRegistry is Trust, Nonces, EIP712 {
 
     uint256 public constant RID_MIGRATION_CUTOFF = 200;
 
-    ////////////////////////////////////////////////////////////////
-    // STORAGE
-    ////////////////////////////////////////////////////////////////    
+    /* * * * * * * * * * * * * * * * * * * * * * * * *
+    *                                                *
+    *                                                *
+    *                   STORAGE                      *
+    *                                                *
+    *                                                *
+    * * * * * * * * * * * * * * * * * * * * * * * * */   
 
-    /* Ids */
+    //////////////////////////////////////////////////
+    // IDS
+    //////////////////////////////////////////////////  
+
     uint256 public idCount;
     mapping(address owner => uint256 rid) public idOf;
     mapping(uint256 rid => address owner) public custodyOf;
     mapping(uint256 rid => address recovery) public recoveryOf;
     mapping(uint256 rid => bool migrated) public hasMigrated;
 
-    /* Keys */
+    //////////////////////////////////////////////////
+    // KEYS
+    //////////////////////////////////////////////////  
+
     mapping(uint256 rid => KeySet activeKeys) internal _activeKeysByRid;
     mapping(uint256 rid => KeySet removedKeys) internal _removedKeysByRid;    
     mapping(uint256 rid => mapping(bytes key => KeyData data)) public keys;    
 
-    ////////////////////////////////////////////////////////////////
-    // CONSTRUCTOR
-    ////////////////////////////////////////////////////////////////      
+    /* * * * * * * * * * * * * * * * * * * * * * * * *
+    *                                                *
+    *                                                *
+    *                 CONSTRUCTOR                    *
+    *                                                *
+    *                                                *
+    * * * * * * * * * * * * * * * * * * * * * * * * */      
 
     constructor(
         address initialOwner,
-        address[] memory initialTrustedCallers
-    ) Trust(initialOwner) EIP712("RiverRegistry", "1") {
+        address[] memory initialTrustedCallers,
+        address payoutRecipient,
+        uint256 price
+    ) Business(initialOwner, payoutRecipient, price) EIP712("RiverRegistry", "1") {
         // other stuff
         bool[] memory trues = new bool[](initialTrustedCallers.length);
         for (uint256 i; i < initialTrustedCallers.length; ++i) {
@@ -117,17 +81,21 @@ contract RiverRegistry is Trust, Nonces, EIP712 {
         _setTrusted(initialTrustedCallers, trues);
     }  
 
-    ////////////////////////////////////////////////////////////////
-    // MIGRATION MANAGEMENT
-    ////////////////////////////////////////////////////////////////      
+    /* * * * * * * * * * * * * * * * * * * * * * * * *
+    *                                                *
+    *                                                *
+    *                   MIGRATION                    *
+    *                                                *
+    *                                                *
+    * * * * * * * * * * * * * * * * * * * * * * * * */      
 
     // NOTE: do a test in foundry to understand if we can actually process
-    //       all the registers in one call or if we wanna split out to diff txns, etc
+    //       all the issues in one call or if we wanna split out to diff txns, etc
     function trustedPrepMigration(address to, address recovery) onlyTrusted public {
         // Revert if targeting an rid after migration cutoff
         if (idCount >= RID_MIGRATION_CUTOFF) revert Past_Migration_Cutoff();
-        // Process register without sig checks
-        _register(to, recovery);
+        // Process issue without sig checks
+        _issue(to, recovery);
     }
 
     // TODO: should we add in a "already migrated" storage variable
@@ -136,13 +104,13 @@ contract RiverRegistry is Trust, Nonces, EIP712 {
     //       is live :(
     //       UPDATE: added the above ^ in because we should be able to not mess this up, plus can
     //               always trigger a change through recovery flow in emergency
-    function trustedMigrateFor(uint256 rid, address recipient, address recovery, KeyRegistration[] calldata keyInit) onlyTrusted public {
+    function trustedMigrateFor(uint256 rid, address recipient, address recovery, KeyInit[] calldata keyInits) onlyTrusted public {
         // Revert if targeting an rid after migration cutoff
         if (rid > RID_MIGRATION_CUTOFF) revert Past_Migration_Cutoff();
         // Revert if rid has already migrated
         if (hasMigrated[rid]) revert Already_Migrated();        
 
-        // check that rid is currently registered, and that recipient doesnt currently own an rid
+        // check rid has been issued, and that recipient doesnt currently own an rid
         address fromCustody = _validateMigration(rid, recipient);
         // transfer rid
         _unsafeTransfer(rid, fromCustody, recipient);
@@ -150,10 +118,10 @@ contract RiverRegistry is Trust, Nonces, EIP712 {
         _unsafeChangeRecovery(rid, recovery);
 
         // Add keys
-        for (uint256 i; i < keyInit.length; ++i) {
+        for (uint256 i; i < keyInits.length; ++i) {
             // false included to skip key validation pathway for migration users
             // since we dont have our own rid setup for signing add key requests yet
-            _add(rid, keyInit[i].keyType, keyInit[i].key);
+            _add(rid, keyInits[i].keyType, keyInits[i].key);
         }
 
         // update migration state for rid
@@ -168,44 +136,84 @@ contract RiverRegistry is Trust, Nonces, EIP712 {
     function _validateMigration(uint256 rid, address to) internal view returns (address fromCustody) {
         // Retrieve current custody address of target rid
         fromCustody = custodyOf[rid];
-        // Revert if rid not registered
+        // Revert if rid not issued
         if (fromCustody == address(0)) revert Has_No_Id();
         // Revert if recipient already has rid
         if (idOf[to] != 0) revert Has_Id();
     }    
 
-    ////////////////////////////////////////////////////////////////
-    // ID MANAGEMENT
-    ////////////////////////////////////////////////////////////////
+    /* * * * * * * * * * * * * * * * * * * * * * * * *
+    *                                                *
+    *                                                *
+    *             ID + KEY MANAGEMENT                *
+    *                                                *
+    *                                                *
+    * * * * * * * * * * * * * * * * * * * * * * * * */   
 
-    // NOTE: ideas for initial compatiability with migration flow
-    // add in checks on register function to not be callable within first 200 ids?
-    // add in a state variable switch that enables it to be called after first 200?
+    //////////////////////////////////////////////////
+    // REGISTER
+    //////////////////////////////////////////////////      
 
-    /**
-     *  REGISGTRATION
-     */
+    function register(address recovery, KeyInit[] calldata keyInits) paid external payable returns (uint256 rid) {
+        // Check if recipient is allowed
+        _isAllowed(msg.sender);
+        // Process register and add
+        rid = _issueAndAdd(msg.sender, recovery, keyInits);
+        // Decrease allowance if contract still !isPublic
+        if (!isPublic) _unsafeDecreaseAllowance(msg.sender);
+    }
+
+    function registerFor(address recipient, address recovery, KeyInit[] calldata keyInits, uint256 deadline, bytes calldata sig) paid external payable returns (uint256 rid) {        
+        // Revert if signature invalid
+        _verifyRegisterSig(recipient, recovery, keyInits, deadline, sig);
+        // Check if recipient is allowed
+        _isAllowed(recipient);        
+        // Process register and add
+        rid = _issueAndAdd(recipient, recovery, keyInits);
+        // Decrease recipient allowance if contract still set to !isPublic
+        if (!isPublic) _unsafeDecreaseAllowance(recipient);           
+    }
+
+    // NOTE: trustedCallers that also have an allowance will not see their allowance decrease when calling this function
+    //       when registering themselves
+    // TODO: is this bad? could restrict `register` to non-trusted callers, but seems unncessary gas wise
+    // @dev bypasses allowance checks
+    // @dev bypasses payment checks
+    function trustedRegisterFor(address recipient, address recovery, KeyInit[] calldata keyInits) onlyTrusted external returns (uint256 rid) {
+        rid = _issueAndAdd(recipient, recovery, keyInits);
+    }
+
+    function _issueAndAdd(address _recipient, address _recovery, KeyInit[] calldata _keyInits) internal returns (uint256 rid) {
+        // Cannot register until migration cutoff has been reached
+        if (idCount < RID_MIGRATION_CUTOFF) revert Before_Migration_Cutoff();
+        // Register rid
+        rid = _issue(_recipient, _recovery);
+        // Add keys
+        for (uint256 i; i < _keyInits.length; ++i) {
+            _add(rid, _keyInits[i].keyType, _keyInits[i].key);
+        }             
+    }
     
-    function _register(address to, address recovery) internal returns (uint256 rid) {
-        rid = _unsafeRegister(to, recovery);
-        emit Register(to, idCount, recovery);
+    function _issue(address to, address recovery) internal returns (uint256 rid) {
+        rid = _unsafeIssue(to, recovery);
+        emit Issue(to, idCount, recovery);
     }
 
     // NOTE: add back in pausing?
-    function _unsafeRegister(address to, address recovery) internal returns (uint256 rid) {
+    function _unsafeIssue(address to, address recovery) internal returns (uint256 rid) {
         /* Revert if the target(to) has an rid */
         if (idOf[to] != 0) revert Has_Id();
         /* Incrementing before assignment ensures that no one gets the 0 rid. */
         rid = ++idCount;
-        /* Register id */
+        /* Issue id */
         idOf[to] = rid;
         custodyOf[rid] = to;
         recoveryOf[rid] = recovery;
     }
 
-    /**
-     *  TRANSFER
-     */    
+    //////////////////////////////////////////////////
+    // TRANSFER
+    //////////////////////////////////////////////////      
 
     /**
      * @dev Retrieve rid and validate sender/recipient
@@ -232,9 +240,9 @@ contract RiverRegistry is Trust, Nonces, EIP712 {
         emit Transfer(from, to, id);
     }
 
-    /**
-     *  RECOVER
-     */ 
+    //////////////////////////////////////////////////
+    // RECOVER
+    //////////////////////////////////////////////////      
 
     /**
      * @dev Change recovery address without checking invariants.
@@ -249,9 +257,11 @@ contract RiverRegistry is Trust, Nonces, EIP712 {
     }    
 
     ////////////////////////////////////////////////////////////////
-    // KEY MANAGEMENT
+    // ADD KEY
     ////////////////////////////////////////////////////////////////   
 
+    // add()
+    // addFor()
 
     // NOTE: removed key validaton from this version of contract
     // add back in pausing
@@ -276,29 +286,21 @@ contract RiverRegistry is Trust, Nonces, EIP712 {
         _activeKeysByRid[rid].add(key);
     }
 
+    //////////////////////////////////////////////////
+    // REMOVE KEY
+    //////////////////////////////////////////////////          
+
+    // remove()
+    // removeFor()
+
     function _removeFromKeySet(uint256 rid, bytes calldata key) internal virtual {
         _activeKeysByRid[rid].remove(key);
         _removedKeysByRid[rid].add(key);
     }
-
-    function _resetFromKeySet(uint256 rid, bytes calldata key) internal virtual {
-        _activeKeysByRid[rid].remove(key);
-    }
-
-    function _keysByState(uint256 rid, KeyState state) internal view returns (KeySet storage) {
-        if (state == KeyState.ADDED) {
-            return _activeKeysByRid[rid];
-        } else if (state == KeyState.REMOVED) {
-            return _removedKeysByRid[rid];
-        } else {
-            revert InvalidState();
-        }
-    }    
                             
     ////////////////////////////////////////////////////////////////
     // VIEWS
     ////////////////////////////////////////////////////////////////        
-
 
     function totalKeys(uint256 rid, KeyState state) public view virtual returns (uint256) {
         return _keysByState(rid, state).length();
@@ -344,8 +346,42 @@ contract RiverRegistry is Trust, Nonces, EIP712 {
         return keys[rid][key];
     }
 
+    function _keysByState(uint256 rid, KeyState state) internal view returns (KeySet storage) {
+        if (state == KeyState.ADDED) {
+            return _activeKeysByRid[rid];
+        } else if (state == KeyState.REMOVED) {
+            return _removedKeysByRid[rid];
+        } else {
+            revert InvalidState();
+        }
+    }    
+        
+    /* * * * * * * * * * * * * * * * * * * * * * * * *
+    *                                                *
+    *                                                *
+    *                    ADMIN                       *
+    *                                                *
+    *                                                *
+    * * * * * * * * * * * * * * * * * * * * * * * * */  
 
-    ////////////////////////////////////////////////////////////////
-    // SIGNATURE HELPERS
-    ////////////////////////////////////////////////////////////////                         
+    // pause
+    // unpause
+    // anything else?
+    
+    /* * * * * * * * * * * * * * * * * * * * * * * * *
+    *                                                *
+    *                                                *
+    *              SIGNATURE HELPERS                 *
+    *                                                *
+    *                                                *
+    * * * * * * * * * * * * * * * * * * * * * * * * */  
+
+    function _verifyRegisterSig(address to, address recovery, KeyInit[] calldata keyInits, uint256 deadline, bytes memory sig) internal {
+        _verifySigWithDeadline(
+            _hashTypedDataV4(keccak256(abi.encode(REGISTER_TYPEHASH, to, recovery, keyInits, _useNonce(to), deadline))),
+            to,
+            deadline,
+            sig
+        );
+    }        
 }
