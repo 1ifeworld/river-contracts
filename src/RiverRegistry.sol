@@ -24,14 +24,10 @@ contract RiverRegistry is IRiverRegistry, Business, Pausable, Nonces, Signatures
     * * * * * * * * * * * * * * * * * * * * * * * * */  
 
     string public constant NAME = "RiverRegistry";
-
     string public constant VERSION = "2024.08.22";
-
     bytes32 public constant REGISTER_TYPEHASH = 
         keccak256("Register(address to,address recovery,KeyData[] keys,uint256 nonce,uint256 deadline)");     
-
     uint256 public constant MAX_KEYS_PER_RID = 500;
-
     uint256 public constant RID_MIGRATION_CUTOFF = 200;
 
     /* * * * * * * * * * * * * * * * * * * * * * * * *
@@ -68,6 +64,9 @@ contract RiverRegistry is IRiverRegistry, Business, Pausable, Nonces, Signatures
     *                                                *
     * * * * * * * * * * * * * * * * * * * * * * * * */      
 
+    /**
+     * @dev fill in
+     */
     constructor(
         address initialOwner,
         address[] memory initialTrustedCallers,
@@ -90,8 +89,9 @@ contract RiverRegistry is IRiverRegistry, Business, Pausable, Nonces, Signatures
     *                                                *
     * * * * * * * * * * * * * * * * * * * * * * * * */      
 
-    // NOTE: do a test in foundry to understand if we can actually process
-    //       all the issues in one call or if we wanna split out to diff txns, etc
+    /**
+     * @dev fill in
+     */
     function trustedPrepMigration(address to, address recovery) public onlyTrusted {
         // Revert if targeting an rid after migration cutoff
         if (idCount >= RID_MIGRATION_CUTOFF) revert Past_Migration_Cutoff();
@@ -99,33 +99,25 @@ contract RiverRegistry is IRiverRegistry, Business, Pausable, Nonces, Signatures
         _issue(to, recovery);
     }
 
-    // TODO: should we add in a "already migrated" storage variable
-    //       that would prevent an rid from being migrated more than once?
-    //       quick answer is yes, but would mean if we mess up we have to redeploy the contract again while prod
-    //       is live :(
-    //       UPDATE: added the above ^ in because we should be able to not mess this up, plus can
-    //               always trigger a change through recovery flow in emergency
+    /**
+     * @dev fill in
+     */
     function trustedMigrateFor(uint256 rid, address recipient, address recovery, KeyInit[] calldata keyInits) public onlyTrusted {
         // Revert if targeting an rid after migration cutoff
         if (rid > RID_MIGRATION_CUTOFF) revert Past_Migration_Cutoff();
         // Revert if rid has already migrated
         if (hasMigrated[rid]) revert Already_Migrated();        
-
-        // check rid has been issued, and that recipient doesnt currently own an rid
+        // Check rid has been issued, and that recipient doesnt currently own an rid
         address fromCustody = _validateMigration(rid, recipient);
-        // transfer rid
+        // Transfer rid
         _unsafeTransfer(rid, fromCustody, recipient);
-        // change recovery addresss
+        // Change recovery addresss
         _unsafeChangeRecovery(rid, recovery);
-
         // Add keys
         for (uint256 i; i < keyInits.length; ++i) {
-            // false included to skip key validation pathway for migration users
-            // since we dont have our own rid setup for signing add key requests yet
             _add(rid, keyInits[i].keyType, keyInits[i].key);
         }
-
-        // update migration state for rid
+        // Update migration state for rid and emit event
         hasMigrated[rid] = true;
         emit Migrate(rid);
     }
@@ -133,8 +125,7 @@ contract RiverRegistry is IRiverRegistry, Business, Pausable, Nonces, Signatures
     /**
      * @dev Retrieve custody and validate rid/recipient
      */
-     // add pausable here?
-    function _validateMigration(uint256 rid, address to) internal view returns (address fromCustody) {
+    function _validateMigration(uint256 rid, address to) internal whenNotPaused view returns (address fromCustody) {
         // Retrieve current custody address of target rid
         fromCustody = custodyOf[rid];
         // Revert if rid not issued
@@ -155,6 +146,9 @@ contract RiverRegistry is IRiverRegistry, Business, Pausable, Nonces, Signatures
     // REGISTER
     //////////////////////////////////////////////////      
 
+    /**
+     * @dev fill in
+     */
     function register(address recovery, KeyInit[] calldata keyInits) external paid payable returns (uint256 rid) {
         // Check if recipient is allowed
         _isAllowed(msg.sender);
@@ -164,6 +158,9 @@ contract RiverRegistry is IRiverRegistry, Business, Pausable, Nonces, Signatures
         if (!isPublic) _unsafeDecreaseAllowance(msg.sender);
     }
 
+    /**
+     * @dev fill in
+     */
     function registerFor(address recipient, address recovery, KeyInit[] calldata keyInits, uint256 deadline, bytes calldata sig) external paid payable returns (uint256 rid) {        
         // Revert if signature invalid
         _verifyRegisterSig(recipient, recovery, keyInits, deadline, sig);
@@ -175,16 +172,18 @@ contract RiverRegistry is IRiverRegistry, Business, Pausable, Nonces, Signatures
         if (!isPublic) _unsafeDecreaseAllowance(recipient);           
     }
 
-    // NOTE: trustedCallers that also have an allowance will not see their allowance decrease when calling this function
-    //       when registering themselves
-    // TODO: is this bad? could restrict `register` to non-trusted callers, but seems unncessary gas wise
-    // @dev bypasses allowance checks
-    // @dev bypasses payment checks
     // NOTE: add payable? without price check?
+    /**
+     * @dev Bypasses allowance checks + decreases
+     * @dev Bypasses payment checks + spends
+     */    
     function trustedRegisterFor(address recipient, address recovery, KeyInit[] calldata keyInits) external onlyTrusted returns (uint256 rid) {
         rid = _issueAndAdd(recipient, recovery, keyInits);
     }
 
+    /**
+     * @dev fill in
+     */
     function _issueAndAdd(address _recipient, address _recovery, KeyInit[] calldata _keyInits) internal returns (uint256 rid) {
         // Cannot register until migration cutoff has been reached
         if (idCount < RID_MIGRATION_CUTOFF) revert Before_Migration_Cutoff();
@@ -196,17 +195,23 @@ contract RiverRegistry is IRiverRegistry, Business, Pausable, Nonces, Signatures
         }             
     }
     
+    /**
+     * @dev fill in
+     */    
     function _issue(address to, address recovery) internal returns (uint256 rid) {
         rid = _unsafeIssue(to, recovery);
         emit Issue(to, idCount, recovery);
     }
 
+    /**
+     * @dev fill in
+     */
     function _unsafeIssue(address to, address recovery) internal whenNotPaused returns (uint256 rid) {
-        /* Revert if the target(to) has an rid */
+        // Revert if the target(to) has an rid 
         if (idOf[to] != 0) revert Has_Id();
-        /* Incrementing before assignment ensures that no one gets the 0 rid. */
+        // Incrementing before assignment ensures that no one gets the 0 rid.
         rid = ++idCount;
-        /* Issue id */
+        // Issue id
         idOf[to] = rid;
         custodyOf[rid] = to;
         recoveryOf[rid] = recovery;
@@ -225,9 +230,9 @@ contract RiverRegistry is IRiverRegistry, Business, Pausable, Nonces, Signatures
     function _validateTransfer(address from, address to) internal view returns (uint256 fromId) {
         fromId = idOf[from];
 
-        /* Revert if the sender has no id */
+        // Revert if the sender has no id
         if (fromId == 0) revert Has_No_Id();
-        /* Revert if recipient has an id */
+        // Revert if recipient has an id
         if (idOf[to] != 0) revert Has_Id();
     }
 
@@ -235,7 +240,6 @@ contract RiverRegistry is IRiverRegistry, Business, Pausable, Nonces, Signatures
      * @dev Transfer the rid to another address without checking invariants.
      * @dev Will revert if contract is paused     
      */
-     // add back in puausing?
     function _unsafeTransfer(uint256 id, address from, address to) internal whenNotPaused {
         idOf[to] = id;
         custodyOf[id] = to;
@@ -256,9 +260,8 @@ contract RiverRegistry is IRiverRegistry, Business, Pausable, Nonces, Signatures
      * @dev Change recovery address without checking invariants.
      * @dev Will revert if contract is paused
      */
-     // add back in pausing ??
     function _unsafeChangeRecovery(uint256 id, address recovery) internal whenNotPaused {
-        /* Change the recovery address */
+        // Change the recovery address
         recoveryOf[id] = recovery;
 
         emit ChangeRecoveryAddress(id, recovery);
@@ -272,8 +275,9 @@ contract RiverRegistry is IRiverRegistry, Business, Pausable, Nonces, Signatures
     // addFor()
     // trustedAddFor() ???
 
-    // NOTE: removed key validaton from this version of contract
-    // add back in pausing
+    /**
+     * @dev fill in
+     */
     function _add(
         uint256 rid,
         uint32 keyType,
@@ -290,7 +294,9 @@ contract RiverRegistry is IRiverRegistry, Business, Pausable, Nonces, Signatures
         emit Add(rid, keyType, key, key);
     }                 
 
-
+    /**
+     * @dev fill in
+     */
     function _addToKeySet(uint256 rid, bytes calldata key) internal virtual {
         _activeKeysByRid[rid].add(key);
     }
@@ -301,9 +307,11 @@ contract RiverRegistry is IRiverRegistry, Business, Pausable, Nonces, Signatures
 
     // remove()
     // removeFor()
-    // _remove() - this should have whenNotPaused modifier
-    // trustedRemoveFor() ???
+    // _remove() - this should have whenNotPaused modifier, and calls _removeFromKeySet
 
+    /**
+     * @dev fill in
+     */
     function _removeFromKeySet(uint256 rid, bytes calldata key) internal virtual {
         _activeKeysByRid[rid].remove(key);
         _removedKeysByRid[rid].add(key);
@@ -395,6 +403,7 @@ contract RiverRegistry is IRiverRegistry, Business, Pausable, Nonces, Signatures
     // verifyTransferSig()
     // verifyRecoverSig()
     // verifyAddSig()
+    // verifyRemoveSig()
 
     function _verifyRegisterSig(address to, address recovery, KeyInit[] calldata keyInits, uint256 deadline, bytes memory sig) internal {
         _verifySigWithDeadline(
