@@ -51,6 +51,32 @@ abstract contract RiverRegistryTestSuite is TestSuiteSetup {
     }    
 
     /* EOA STUFF */
+    function _signTransferAndChangeRecovery(
+        uint256 pk,
+        uint256 rid,
+        address to,
+        address recovery,
+        uint256 deadline
+    ) internal view returns (bytes memory signature) {
+        address signer = vm.addr(pk);
+        bytes32 digest = riverRegistry.hashTypedDataV4(
+            keccak256(abi.encode(riverRegistry.TRANSFER_AND_CHANGE_RECOVERY_TYPEHASH(), rid, to, recovery, riverRegistry.nonces(signer), deadline))
+        );
+        signature = _sign(pk, digest);
+    }      
+
+    function _signTransfer(
+        uint256 pk,
+        uint256 rid,
+        address to,
+        uint256 deadline
+    ) internal view returns (bytes memory signature) {
+        address signer = vm.addr(pk);
+        bytes32 digest = riverRegistry.hashTypedDataV4(
+            keccak256(abi.encode(riverRegistry.TRANSFER_TYPEHASH(), rid, to, riverRegistry.nonces(signer), deadline))
+        );
+        signature = _sign(pk, digest);
+    }        
 
     function _signRegister(
         uint256 pk,

@@ -655,17 +655,199 @@ contract RiverRegistryTest is RiverRegistryTestSuite {
     *                                                *
     * * * * * * * * * * * * * * * * * * * * * * * * */
 
+    // invariants   
+    // - only if contract isnt paused
+
     //////////////////////////////////////////////////
     // TRANSFER
-    //////////////////////////////////////////////////       
+    //////////////////////////////////////////////////      
+
+    function test_transfer() public {
+        // start prank as trusted caller
+        vm.startPrank(trusted.addr);
+
+        // process prep migration
+        _prepMigrateForAccounts(riverRegistry.RID_MIGRATION_CUTOFF());
+        // trusted register id to user address
+        IRiverRegistry.KeyInit[][] memory keyInits = generateKeyInits(1);   
+        uint256 issuedRid = riverRegistry.trustedRegisterFor(user.addr, recovery.addr, keyInits[0]);        
+
+        vm.stopPrank();
+        vm.startPrank(user.addr);
+
+        Account memory toCustody = makeAccount("transfer");
+        bytes memory toSig = _signTransfer(toCustody.key, issuedRid, toCustody.addr, _deadline());
+        riverRegistry.transfer(toCustody.addr, _deadline(), toSig);
+
+        assertEq(riverRegistry.idOf(toCustody.addr), issuedRid);
+        assertEq(riverRegistry.custodyOf(issuedRid), toCustody.addr);
+        assertEq(riverRegistry.idOf(user.addr), 0);
+    }      
+
+    function test_revertEnforcedPause_transfer() public {
+        // start prank as trusted caller
+        vm.startPrank(trusted.addr);
+
+        // process prep migration
+        _prepMigrateForAccounts(riverRegistry.RID_MIGRATION_CUTOFF());
+        // trusted register id to user address
+        IRiverRegistry.KeyInit[][] memory keyInits = generateKeyInits(1);   
+        uint256 issuedRid = riverRegistry.trustedRegisterFor(user.addr, recovery.addr, keyInits[0]);        
+
+        riverRegistry.pause();
+        vm.stopPrank();
+        vm.startPrank(user.addr);
+
+        Account memory toCustody = makeAccount("transfer");
+        bytes memory toSig = _signTransfer(toCustody.key, issuedRid, toCustody.addr, _deadline());
+        vm.expectRevert(abi.encodeWithSignature("EnforcedPause()"));
+        riverRegistry.transfer(toCustody.addr, _deadline(), toSig);
+    }          
 
     //////////////////////////////////////////////////
     // TRANSFER FOR
-    //////////////////////////////////////////////////            
+    //////////////////////////////////////////////////        
+
+    function test_sigTransferFor() public {
+        // start prank as trusted caller
+        vm.startPrank(trusted.addr);
+
+        // process prep migration
+        _prepMigrateForAccounts(riverRegistry.RID_MIGRATION_CUTOFF());
+        // trusted register id to user address
+        IRiverRegistry.KeyInit[][] memory keyInits = generateKeyInits(1);   
+        uint256 issuedRid = riverRegistry.trustedRegisterFor(user.addr, recovery.addr, keyInits[0]);        
+
+        vm.stopPrank();
+        vm.startPrank(relayer.addr);
+
+        Account memory toCustody = makeAccount("transfer");
+        bytes memory toSig = _signTransfer(toCustody.key, issuedRid, toCustody.addr, _deadline());
+        bytes memory fromSig = _signTransfer(user.key, issuedRid, toCustody.addr, _deadline());
+        riverRegistry.transferFor(user.addr, toCustody.addr, _deadline(), fromSig, _deadline(), toSig);
+
+        assertEq(riverRegistry.idOf(toCustody.addr), issuedRid);
+        assertEq(riverRegistry.custodyOf(issuedRid), toCustody.addr);
+        assertEq(riverRegistry.idOf(user.addr), 0);
+    }       
+
+    function test_revertEnforcedPause_transferFor() public {
+        // start prank as trusted caller
+        vm.startPrank(trusted.addr);
+
+        // process prep migration
+        _prepMigrateForAccounts(riverRegistry.RID_MIGRATION_CUTOFF());
+        // trusted register id to user address
+        IRiverRegistry.KeyInit[][] memory keyInits = generateKeyInits(1);   
+        uint256 issuedRid = riverRegistry.trustedRegisterFor(user.addr, recovery.addr, keyInits[0]);        
+
+        riverRegistry.pause();
+        vm.stopPrank();
+        vm.startPrank(relayer.addr);
+
+        Account memory toCustody = makeAccount("transfer");
+        bytes memory toSig = _signTransfer(toCustody.key, issuedRid, toCustody.addr, _deadline());
+        bytes memory fromSig = _signTransfer(user.key, issuedRid, toCustody.addr, _deadline());
+        vm.expectRevert(abi.encodeWithSignature("EnforcedPause()"));
+        riverRegistry.transferFor(user.addr, toCustody.addr, _deadline(), fromSig, _deadline(), toSig);        
+    }               
 
     //////////////////////////////////////////////////
-    // TRANSFER AND CHANGE RECOVERY ????
-    //////////////////////////////////////////////////          
+    // TRANSFER AND CHANGE RECOVERY
+    //////////////////////////////////////////////////             
+    
+    function test_transferAndChangeRecovery() public {
+        // start prank as trusted caller
+        vm.startPrank(trusted.addr);
+
+        // process prep migration
+        _prepMigrateForAccounts(riverRegistry.RID_MIGRATION_CUTOFF());
+        // trusted register id to user address
+        IRiverRegistry.KeyInit[][] memory keyInits = generateKeyInits(1);   
+        uint256 issuedRid = riverRegistry.trustedRegisterFor(user.addr, recovery.addr, keyInits[0]);        
+
+        vm.stopPrank();
+        vm.startPrank(user.addr);
+
+        Account memory toCustody = makeAccount("transfer");
+        Account memory newRecovery = makeAccount("newRecovery");
+        bytes memory toSig = _signTransferAndChangeRecovery(toCustody.key, issuedRid, toCustody.addr, newRecovery.addr, _deadline());
+        riverRegistry.transferAndChangeRecovery(toCustody.addr, newRecovery.addr, _deadline(), toSig);
+
+        assertEq(riverRegistry.idOf(toCustody.addr), issuedRid);
+        assertEq(riverRegistry.custodyOf(issuedRid), toCustody.addr);
+        assertEq(riverRegistry.recoveryOf(issuedRid), newRecovery.addr);
+        assertEq(riverRegistry.idOf(user.addr), 0);
+    }      
+
+    function test_revertEnforcedPause_transferAndChangeRecovery() public {
+        // start prank as trusted caller
+        vm.startPrank(trusted.addr);
+
+        // process prep migration
+        _prepMigrateForAccounts(riverRegistry.RID_MIGRATION_CUTOFF());
+        // trusted register id to user address
+        IRiverRegistry.KeyInit[][] memory keyInits = generateKeyInits(1);   
+        uint256 issuedRid = riverRegistry.trustedRegisterFor(user.addr, recovery.addr, keyInits[0]);        
+
+        riverRegistry.pause();
+        vm.stopPrank();
+        vm.startPrank(user.addr);
+
+        Account memory toCustody = makeAccount("transfer");
+        Account memory newRecovery = makeAccount("newRecovery");
+        bytes memory toSig = _signTransferAndChangeRecovery(toCustody.key, issuedRid, toCustody.addr, newRecovery.addr, _deadline());
+        vm.expectRevert(abi.encodeWithSignature("EnforcedPause()"));
+        riverRegistry.transferAndChangeRecovery(toCustody.addr, newRecovery.addr, _deadline(), toSig);        
+    }          
+
+
+    function test_sigTransferAndChangeRecoveryFor() public {
+        // start prank as trusted caller
+        vm.startPrank(trusted.addr);
+
+        // process prep migration
+        _prepMigrateForAccounts(riverRegistry.RID_MIGRATION_CUTOFF());
+        // trusted register id to user address
+        IRiverRegistry.KeyInit[][] memory keyInits = generateKeyInits(1);   
+        uint256 issuedRid = riverRegistry.trustedRegisterFor(user.addr, recovery.addr, keyInits[0]);        
+
+        vm.stopPrank();
+        vm.startPrank(relayer.addr);
+
+        Account memory toCustody = makeAccount("transfer");
+        Account memory newRecovery = makeAccount("newRecovery");
+        bytes memory toSig = _signTransferAndChangeRecovery(toCustody.key, issuedRid, toCustody.addr, newRecovery.addr, _deadline());
+        bytes memory fromSig = _signTransferAndChangeRecovery(user.key, issuedRid, toCustody.addr, newRecovery.addr, _deadline());
+        riverRegistry.transferAndChangeRecoveryFor(user.addr, toCustody.addr, newRecovery.addr, _deadline(), fromSig, _deadline(), toSig);
+
+        assertEq(riverRegistry.idOf(toCustody.addr), issuedRid);
+        assertEq(riverRegistry.custodyOf(issuedRid), toCustody.addr);
+        assertEq(riverRegistry.recoveryOf(issuedRid), newRecovery.addr);
+        assertEq(riverRegistry.idOf(user.addr), 0);
+    }       
+
+    function test_revertEnforcedPause_sigTransferAndChangeRecoveryFor() public {
+        // start prank as trusted caller
+        vm.startPrank(trusted.addr);
+
+        // process prep migration
+        _prepMigrateForAccounts(riverRegistry.RID_MIGRATION_CUTOFF());
+        // trusted register id to user address
+        IRiverRegistry.KeyInit[][] memory keyInits = generateKeyInits(1);   
+        uint256 issuedRid = riverRegistry.trustedRegisterFor(user.addr, recovery.addr, keyInits[0]);        
+
+        riverRegistry.pause();
+        vm.stopPrank();
+        vm.startPrank(relayer.addr);
+
+        Account memory toCustody = makeAccount("transfer");
+        Account memory newRecovery = makeAccount("newRecovery");
+        bytes memory toSig = _signTransferAndChangeRecovery(toCustody.key, issuedRid, toCustody.addr, newRecovery.addr, _deadline());
+        bytes memory fromSig = _signTransferAndChangeRecovery(user.key, issuedRid, toCustody.addr, newRecovery.addr, _deadline());
+        vm.expectRevert(abi.encodeWithSignature("EnforcedPause()"));
+        riverRegistry.transferAndChangeRecoveryFor(user.addr, toCustody.addr, newRecovery.addr, _deadline(), fromSig, _deadline(), toSig);        
+    }         
 
     /* * * * * * * * * * * * * * * * * * * * * * * * *
     *                                                *
