@@ -11,6 +11,8 @@ import {Signatures} from "./abstract/Signatures.sol";
 
 /**
  * @title RiverRegistry
+ * @author Lifeworld
+ * @custom:security-contact devops@lifeworld.co
  */
 contract RiverRegistry is IRiverRegistry, Business, Pausable, Nonces, Signatures, EIP712 {
     using EnumerableKeySet for KeySet;
@@ -73,7 +75,6 @@ contract RiverRegistry is IRiverRegistry, Business, Pausable, Nonces, Signatures
         address payoutRecipient,
         uint256 price
     ) Business(initialOwner, payoutRecipient, price) EIP712("RiverRegistry", "1") {
-        // other stuff
         bool[] memory trues = new bool[](initialTrustedCallers.length);
         for (uint256 i; i < initialTrustedCallers.length; ++i) {
             trues[i] = true;
