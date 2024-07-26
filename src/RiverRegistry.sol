@@ -29,7 +29,7 @@ contract RiverRegistry is IRiverRegistry, Business, Pausable, Nonces, Signatures
 
     string public constant NAME = "RiverRegistry";
 
-    string public constant VERSION = "2024.08.22";
+    string public constant VERSION = "2024.08.26";
 
     bytes32 public constant REGISTER_TYPEHASH = 
         keccak256("Register(address to,address recovery,KeyData[] keys,uint256 nonce,uint256 deadline)");  
