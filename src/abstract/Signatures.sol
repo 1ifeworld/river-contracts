@@ -2,7 +2,6 @@
 pragma solidity 0.8.23;
 
 import {SignatureCheckerLib} from "@solady/utils/SignatureCheckerLib.sol";
-import {SignatureChecker} from "@openzeppelin/utils/cryptography/SignatureChecker.sol";
 
 abstract contract Signatures {
 

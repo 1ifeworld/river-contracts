@@ -22,6 +22,7 @@ contract SmartWalletTest is TestSuiteSetup {
 
     function setUp() public virtual override {
         super.setUp();
+        smartWallet = smartWalletFactory.createAccount(owners, nonce);
         verifier = new Mock6492Verifier();
     }
 
