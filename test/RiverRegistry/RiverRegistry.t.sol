@@ -965,9 +965,8 @@ contract RiverRegistryTest is RiverRegistryTestSuite {
         vm.startPrank(malicious.addr);
         assertEq(riverRegistry.recoveryOf(issuedRid), recovery.addr);
         Account memory newRecovery = makeAccount("newRecovery");
-        vm.expectRevert();
+        vm.expectRevert(abi.encodeWithSignature("Has_No_Id()"));
         riverRegistry.changeRecoveryAddress(newRecovery.addr);
-        // assertEq(riverRegistry.recoveryOf(issuedRid), newRecovery.addr);
     }         
 
     function test_sigChangeRecoveryFor() public {
@@ -1001,15 +1000,142 @@ contract RiverRegistryTest is RiverRegistryTestSuite {
     // ADD
     //////////////////////////////////////////////////         
 
+    function test_add() public {
+        // start prank as trusted caller
+        vm.startPrank(trusted.addr);
+
+        // process prep migration
+        _prepMigrateForAccounts(riverRegistry.RID_MIGRATION_CUTOFF());
+
+        IRiverRegistry.KeyInit[][] memory keyInits = generateKeyInits(1);   
+        uint256 issuedRid = riverRegistry.trustedRegisterFor(user.addr, recovery.addr, keyInits[0]);   
+
+        vm.stopPrank();
+        vm.startPrank(user.addr);                  
+    
+        IRiverRegistry.KeyInit[] memory addKeyInit = new IRiverRegistry.KeyInit[](1);
+        addKeyInit[0] = IRiverRegistry.KeyInit({
+            keyType: 1,
+            key: abi.encode("addKeyInit")
+        });
+        riverRegistry.add(addKeyInit[0].keyType, addKeyInit[0].key);
+
+        IRiverRegistry.KeyData memory keyData = riverRegistry.keyDataOf(issuedRid, addKeyInit[0].key);        
+        assertEq(uint256(keyData.state), uint256(IRiverRegistry.KeyState.ADDED));
+        assertEq(keyData.keyType, 1);
+        assertEq(riverRegistry.totalKeys(issuedRid, IRiverRegistry.KeyState.ADDED), 2);
+        bytes memory addedKey = riverRegistry.keyAt(issuedRid, IRiverRegistry.KeyState.ADDED, 1);
+        assertEq(addedKey, addKeyInit[0].key);
+    }        
+
+    function test_revertUnauthorized_add() public {
+        // start prank as trusted caller
+        vm.startPrank(trusted.addr);
+
+        // process prep migration
+        _prepMigrateForAccounts(riverRegistry.RID_MIGRATION_CUTOFF());
+
+        IRiverRegistry.KeyInit[][] memory keyInits = generateKeyInits(1);   
+        uint256 issuedRid = riverRegistry.trustedRegisterFor(user.addr, recovery.addr, keyInits[0]);   
+
+        vm.stopPrank();
+        vm.startPrank(malicious.addr);                  
+    
+        IRiverRegistry.KeyInit[] memory addKeyInit = new IRiverRegistry.KeyInit[](1);
+        addKeyInit[0] = IRiverRegistry.KeyInit({
+            keyType: 1,
+            key: abi.encode("addKeyInit")
+        });
+        vm.expectRevert(abi.encodeWithSignature("Unauthorized()"));
+        riverRegistry.add(addKeyInit[0].keyType, addKeyInit[0].key);
+    }        
+
+    function test_revertEnforcedPause_add() public {
+        // start prank as trusted caller
+        vm.startPrank(trusted.addr);
+
+        // process prep migration
+        _prepMigrateForAccounts(riverRegistry.RID_MIGRATION_CUTOFF());
+
+        IRiverRegistry.KeyInit[][] memory keyInits = generateKeyInits(1);   
+        uint256 issuedRid = riverRegistry.trustedRegisterFor(user.addr, recovery.addr, keyInits[0]);   
+
+        riverRegistry.pause();
+        vm.stopPrank();
+        vm.startPrank(user.addr);                  
+    
+        IRiverRegistry.KeyInit[] memory addKeyInit = new IRiverRegistry.KeyInit[](1);
+        addKeyInit[0] = IRiverRegistry.KeyInit({
+            keyType: 1,
+            key: abi.encode("addKeyInit")
+        });
+        vm.expectRevert(abi.encodeWithSignature("EnforcedPause()"));
+        riverRegistry.add(addKeyInit[0].keyType, addKeyInit[0].key);
+    }            
+
     //////////////////////////////////////////////////
     // ADD FOR
-    //////////////////////////////////////////////////             
+    //////////////////////////////////////////////////      
+
+    function test_sigAddFor() public {
+        // start prank as trusted caller
+        vm.startPrank(trusted.addr);
+
+        // process prep migration
+        _prepMigrateForAccounts(riverRegistry.RID_MIGRATION_CUTOFF());
+
+        IRiverRegistry.KeyInit[][] memory keyInits = generateKeyInits(1);   
+        uint256 issuedRid = riverRegistry.trustedRegisterFor(user.addr, recovery.addr, keyInits[0]);
+
+        vm.stopPrank();
+        vm.startPrank(relayer.addr);          
+    
+        IRiverRegistry.KeyInit[] memory addKeyInit = new IRiverRegistry.KeyInit[](1);
+        addKeyInit[0] = IRiverRegistry.KeyInit({
+            keyType: 1,
+            key: abi.encode("addKeyInit")
+        });
+        bytes memory addSig = _signAdd(user.key, user.addr, addKeyInit[0].keyType, addKeyInit[0].key, _deadline());
+        riverRegistry.addFor(user.addr, addKeyInit[0].keyType, addKeyInit[0].key, _deadline(), addSig);
+
+        IRiverRegistry.KeyData memory keyData = riverRegistry.keyDataOf(issuedRid, addKeyInit[0].key);        
+        assertEq(uint256(keyData.state), uint256(IRiverRegistry.KeyState.ADDED));
+        assertEq(keyData.keyType, 1);
+        assertEq(riverRegistry.totalKeys(issuedRid, IRiverRegistry.KeyState.ADDED), 2);
+        bytes memory addedKey = riverRegistry.keyAt(issuedRid, IRiverRegistry.KeyState.ADDED, 1);
+        assertEq(addedKey, addKeyInit[0].key);
+    }               
 
     //////////////////////////////////////////////////
-    // ??? TRUSTED ADD FOR 
+    // TRUSTED ADD FOR 
     //////////////////////////////////////////////////                 
 
-    // is this bad vibes 0_0
+    function test_trustedAddFor() public {
+        // start prank as trusted caller
+        vm.startPrank(trusted.addr);
+
+        // process prep migration
+        _prepMigrateForAccounts(riverRegistry.RID_MIGRATION_CUTOFF());
+
+        address randomCustody = randomishAccount(uint256(keccak256(bytes("trustedRegisterFor"))));   
+        IRiverRegistry.KeyInit[][] memory keyInits = generateKeyInits(1);   
+        uint256 issuedRid = riverRegistry.trustedRegisterFor(randomCustody, recovery.addr, keyInits[0]);
+    
+        IRiverRegistry.KeyInit[] memory addKeyInit = new IRiverRegistry.KeyInit[](1);
+        addKeyInit[0] = IRiverRegistry.KeyInit({
+            keyType: 1,
+            key: abi.encode("addKeyInit")
+        });
+        riverRegistry.trustedAddFor(randomCustody, addKeyInit[0].keyType, addKeyInit[0].key);
+
+
+        IRiverRegistry.KeyData memory keyData = riverRegistry.keyDataOf(issuedRid, addKeyInit[0].key);        
+        assertEq(uint256(keyData.state), uint256(IRiverRegistry.KeyState.ADDED));
+        assertEq(keyData.keyType, 1);
+        assertEq(riverRegistry.totalKeys(issuedRid, IRiverRegistry.KeyState.ADDED), 2);
+        bytes memory addedKey = riverRegistry.keyAt(issuedRid, IRiverRegistry.KeyState.ADDED, 1);
+        assertEq(addedKey, addKeyInit[0].key);
+    }           
 
     /* * * * * * * * * * * * * * * * * * * * * * * * *
     *                                                *

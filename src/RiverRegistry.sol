@@ -468,6 +468,10 @@ contract RiverRegistry is IRiverRegistry, Business, Pausable, Nonces, Signatures
     // ADD KEY
     ////////////////////////////////////////////////////////////////   
 
+    /*
+    * `add()` functions can always be called by the by/on behalf of rid owner, as long as the contract isnt paused
+    */         
+
     /**
      * @dev No signature checks performed
      * @dev Only callable by trusted caller
@@ -529,7 +533,11 @@ contract RiverRegistry is IRiverRegistry, Business, Pausable, Nonces, Signatures
 
     //////////////////////////////////////////////////
     // REMOVE KEY
-    //////////////////////////////////////////////////          
+    //////////////////////////////////////////////////   
+
+    /*
+    * `remove()` functions can always be called by the by/on behalf of rid owner, as long as the contract isnt paused
+    */               
 
     function remove(bytes calldata key) external {
         _remove(_ridOf(msg.sender), key);
@@ -620,7 +628,6 @@ contract RiverRegistry is IRiverRegistry, Business, Pausable, Nonces, Signatures
 
         return (page, nextIdx);
     }
-
 
     function keyDataOf(uint256 rid, bytes calldata key) external view returns (KeyData memory) {
         return keys[rid][key];

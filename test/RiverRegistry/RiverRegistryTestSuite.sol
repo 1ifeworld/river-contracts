@@ -52,6 +52,20 @@ abstract contract RiverRegistryTestSuite is TestSuiteSetup {
 
     /* EOA STUFF */
 
+    function _signAdd(
+        uint256 pk,
+        address to,
+        uint32 keyType,
+        bytes memory key,
+        uint256 deadline
+    ) internal view returns (bytes memory signature) {
+        address signer = vm.addr(pk);
+        bytes32 digest = riverRegistry.hashTypedDataV4(
+            keccak256(abi.encode(riverRegistry.ADD_TYPEHASH(), to, keyType, key, riverRegistry.nonces(signer), deadline))
+        );
+        signature = _sign(pk, digest);
+    }          
+
     function _signChangeRecoveryAddress(
         uint256 pkRidOwner,
         uint256 rid,
