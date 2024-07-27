@@ -449,6 +449,7 @@ contract RiverRegistry is IRiverRegistry, Business, Pausable, Nonces, Signatures
         if (idOf[to] != 0) revert Has_Id();
 
         // Revert if either signature is invalid
+        // First sig enforces check on recovery account origin
         _verifyTransferSig({
             rid: fromId,
             to: to,

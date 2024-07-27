@@ -861,13 +861,136 @@ contract RiverRegistryTest is RiverRegistryTestSuite {
     // RECOVER
     //////////////////////////////////////////////////      
 
+    function test_recover() public {
+        // start prank as trusted caller
+        vm.startPrank(trusted.addr);
+
+        // process prep migration
+        _prepMigrateForAccounts(riverRegistry.RID_MIGRATION_CUTOFF());
+        // trusted register id to user address
+        IRiverRegistry.KeyInit[][] memory keyInits = generateKeyInits(1);   
+        uint256 issuedRid = riverRegistry.trustedRegisterFor(user.addr, recovery.addr, keyInits[0]);        
+
+        vm.stopPrank();
+        vm.startPrank(recovery.addr);
+
+        Account memory toCustody = makeAccount("recover");
+        bytes memory toSig = _signTransfer(toCustody.key, issuedRid, toCustody.addr, _deadline());
+        riverRegistry.recover(user.addr, toCustody.addr, _deadline(), toSig);
+
+        assertEq(riverRegistry.idOf(toCustody.addr), issuedRid);
+        assertEq(riverRegistry.custodyOf(issuedRid), toCustody.addr);
+        assertEq(riverRegistry.idOf(user.addr), 0);
+    }          
+
+    function test_revertNotRecovery_recover() public {
+        // start prank as trusted caller
+        vm.startPrank(trusted.addr);
+
+        // process prep migration
+        _prepMigrateForAccounts(riverRegistry.RID_MIGRATION_CUTOFF());
+        // trusted register id to user address
+        IRiverRegistry.KeyInit[][] memory keyInits = generateKeyInits(1);   
+        uint256 issuedRid = riverRegistry.trustedRegisterFor(user.addr, recovery.addr, keyInits[0]);        
+
+        vm.stopPrank();
+        vm.startPrank(malicious.addr);
+
+        Account memory toCustody = makeAccount("recover");
+        bytes memory toSig = _signTransfer(toCustody.key, issuedRid, toCustody.addr, _deadline());
+        vm.expectRevert(abi.encodeWithSignature("Unauthorized()"));
+        riverRegistry.recover(user.addr, toCustody.addr, _deadline(), toSig);
+    }          
+
     //////////////////////////////////////////////////
     // RECOVER FOR
-    //////////////////////////////////////////////////          
+    //////////////////////////////////////////////////  
+
+   function test_sigRecoverFor() public {
+        // start prank as trusted caller
+        vm.startPrank(trusted.addr);
+
+        // process prep migration
+        _prepMigrateForAccounts(riverRegistry.RID_MIGRATION_CUTOFF());
+        // trusted register id to user address
+        IRiverRegistry.KeyInit[][] memory keyInits = generateKeyInits(1);   
+        uint256 issuedRid = riverRegistry.trustedRegisterFor(user.addr, recovery.addr, keyInits[0]);        
+
+        vm.stopPrank();
+        vm.startPrank(relayer.addr);
+
+        Account memory toCustody = makeAccount("recover");
+        bytes memory recoverySig = _signTransfer(recovery.key, issuedRid, toCustody.addr, _deadline());
+        bytes memory toSig = _signTransfer(toCustody.key, issuedRid, toCustody.addr, _deadline());
+        riverRegistry.recoverFor(user.addr, toCustody.addr, _deadline(), recoverySig, _deadline(), toSig);
+
+        assertEq(riverRegistry.idOf(toCustody.addr), issuedRid);
+        assertEq(riverRegistry.custodyOf(issuedRid), toCustody.addr);
+        assertEq(riverRegistry.idOf(user.addr), 0);
+    }                      
 
     //////////////////////////////////////////////////
     // CHANGE RECOVERY
-    //////////////////////////////////////////////////              
+    //////////////////////////////////////////////////          
+
+    function test_changeRecovery() public {
+        // start prank as trusted caller
+        vm.startPrank(trusted.addr);
+
+        // process prep migration
+        _prepMigrateForAccounts(riverRegistry.RID_MIGRATION_CUTOFF());
+        // trusted register id to user address
+        IRiverRegistry.KeyInit[][] memory keyInits = generateKeyInits(1);   
+        uint256 issuedRid = riverRegistry.trustedRegisterFor(user.addr, recovery.addr, keyInits[0]);        
+
+        vm.stopPrank();
+        vm.startPrank(user.addr);
+        assertEq(riverRegistry.recoveryOf(issuedRid), recovery.addr);
+        Account memory newRecovery = makeAccount("newRecovery");
+        riverRegistry.changeRecoveryAddress(newRecovery.addr);
+        assertEq(riverRegistry.recoveryOf(issuedRid), newRecovery.addr);
+    }               
+
+    function test_revertHasNoId_changeRecovery() public {
+        // start prank as trusted caller
+        vm.startPrank(trusted.addr);
+
+        // process prep migration
+        _prepMigrateForAccounts(riverRegistry.RID_MIGRATION_CUTOFF());
+        // trusted register id to user address
+        IRiverRegistry.KeyInit[][] memory keyInits = generateKeyInits(1);   
+        uint256 issuedRid = riverRegistry.trustedRegisterFor(user.addr, recovery.addr, keyInits[0]);        
+
+        vm.stopPrank();
+        vm.startPrank(malicious.addr);
+        assertEq(riverRegistry.recoveryOf(issuedRid), recovery.addr);
+        Account memory newRecovery = makeAccount("newRecovery");
+        vm.expectRevert();
+        riverRegistry.changeRecoveryAddress(newRecovery.addr);
+        // assertEq(riverRegistry.recoveryOf(issuedRid), newRecovery.addr);
+    }         
+
+    function test_sigChangeRecoveryFor() public {
+        // start prank as trusted caller
+        vm.startPrank(trusted.addr);
+
+        // process prep migration
+        _prepMigrateForAccounts(riverRegistry.RID_MIGRATION_CUTOFF());
+        // trusted register id to user address
+        IRiverRegistry.KeyInit[][] memory keyInits = generateKeyInits(1);   
+        uint256 issuedRid = riverRegistry.trustedRegisterFor(user.addr, recovery.addr, keyInits[0]);        
+
+        vm.stopPrank();
+        vm.startPrank(relayer.addr);
+        assertEq(riverRegistry.recoveryOf(issuedRid), recovery.addr);
+        Account memory newRecovery = makeAccount("newRecovery");
+        // bytes memory toSig = _signTransfer(toCustody.key, issuedRid, toCustody.addr, _deadline());
+        // bytes memory ridOwnerSig = _signChangeRecoveryAddress(user.key, issuedRid, user.addr, newRecovery.addr, _deadline());
+        bytes memory ridOwnerSig = _signChangeRecoveryAddress(user.key, issuedRid, recovery.addr, newRecovery.addr, _deadline());
+        // riverRegistry.changeRecoveryAddress(newRecovery.addr);
+        riverRegistry.changeRecoveryAddressFor(user.addr, newRecovery.addr, _deadline(), ridOwnerSig);
+        assertEq(riverRegistry.recoveryOf(issuedRid), newRecovery.addr);
+    }          
 
     /* * * * * * * * * * * * * * * * * * * * * * * * *
     *                                                *
