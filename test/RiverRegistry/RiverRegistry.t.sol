@@ -984,10 +984,7 @@ contract RiverRegistryTest is RiverRegistryTestSuite {
         vm.startPrank(relayer.addr);
         assertEq(riverRegistry.recoveryOf(issuedRid), recovery.addr);
         Account memory newRecovery = makeAccount("newRecovery");
-        // bytes memory toSig = _signTransfer(toCustody.key, issuedRid, toCustody.addr, _deadline());
-        // bytes memory ridOwnerSig = _signChangeRecoveryAddress(user.key, issuedRid, user.addr, newRecovery.addr, _deadline());
         bytes memory ridOwnerSig = _signChangeRecoveryAddress(user.key, issuedRid, recovery.addr, newRecovery.addr, _deadline());
-        // riverRegistry.changeRecoveryAddress(newRecovery.addr);
         riverRegistry.changeRecoveryAddressFor(user.addr, newRecovery.addr, _deadline(), ridOwnerSig);
         assertEq(riverRegistry.recoveryOf(issuedRid), newRecovery.addr);
     }          
