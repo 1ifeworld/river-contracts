@@ -996,6 +996,11 @@ contract RiverRegistryTest is RiverRegistryTestSuite {
     *                                                *
     * * * * * * * * * * * * * * * * * * * * * * * * */  
 
+    // invariants
+    // - cant add key if its not in null state
+    // - cant add key when paused
+
+
     //////////////////////////////////////////////////
     // ADD
     //////////////////////////////////////////////////         
@@ -1140,7 +1145,7 @@ contract RiverRegistryTest is RiverRegistryTestSuite {
     /* * * * * * * * * * * * * * * * * * * * * * * * *
     *                                                *
     *                                                *
-    *               KEY REMOVAL                      *
+    *                 KEY REMOVAL                    *
     *                                                *
     *                                                *
     * * * * * * * * * * * * * * * * * * * * * * * * */  
@@ -1148,6 +1153,29 @@ contract RiverRegistryTest is RiverRegistryTestSuite {
     //////////////////////////////////////////////////
     // REMOVE
     //////////////////////////////////////////////////         
+
+    function test_remove() public {
+        // start prank as trusted caller
+        vm.startPrank(trusted.addr);
+
+        // process prep migration
+        _prepMigrateForAccounts(riverRegistry.RID_MIGRATION_CUTOFF());
+
+        IRiverRegistry.KeyInit[][] memory keyInits = generateKeyInits(1);   
+        uint256 issuedRid = riverRegistry.trustedRegisterFor(user.addr, recovery.addr, keyInits[0]);   
+
+        vm.stopPrank();
+        vm.startPrank(user.addr);                  
+
+        riverRegistry.remove(keyInits[0][0].key);
+
+        IRiverRegistry.KeyData memory keyData = riverRegistry.keyDataOf(issuedRid, keyInits[0][0].key);        
+        assertEq(uint256(keyData.state), uint256(IRiverRegistry.KeyState.REMOVED));
+        assertEq(riverRegistry.totalKeys(issuedRid, IRiverRegistry.KeyState.REMOVED), 1);
+        assertEq(riverRegistry.totalKeys(issuedRid, IRiverRegistry.KeyState.ADDED), 0);
+        bytes memory removedKey = riverRegistry.keyAt(issuedRid, IRiverRegistry.KeyState.REMOVED, 0);
+        assertEq(removedKey, keyInits[0][0].key);          
+    }
 
     //////////////////////////////////////////////////
     // REMOVE FOR
@@ -1169,6 +1197,20 @@ contract RiverRegistryTest is RiverRegistryTestSuite {
     // IS VALID SIGNATURE
     //////////////////////////////////////////////////              
 
+    function test_isValidSignature() public {
+        // register rid to user
+        vm.startPrank(trusted.addr);
+        _prepMigrateForAccounts(riverRegistry.RID_MIGRATION_CUTOFF());
+        IRiverRegistry.KeyInit[][] memory keyInits = generateKeyInits(1);   
+        uint256 issuedRid = riverRegistry.trustedRegisterFor(user.addr, recovery.addr, keyInits[0]); 
+
+        // generate sig for user and request verification from reigstry
+        bytes32 digest = keccak256("isValid");
+        bytes memory sig = _sign(user.key, digest);
+        bool isValid = riverRegistry.verifyRidSignature(user.addr, issuedRid, digest, sig);
+        assertEq(isValid, true);
+    }
+
     /* * * * * * * * * * * * * * * * * * * * * * * * *
     *                                                *
     *                                                *
@@ -1176,6 +1218,11 @@ contract RiverRegistryTest is RiverRegistryTestSuite {
     *                                                *
     *                                                *
     * * * * * * * * * * * * * * * * * * * * * * * * */  
+
+    // change price
+    // change withdraw
+    // payout recipient
+    // increase + decrease allowance
 
     // functionality to add 
     // public registrations on/off, settable by onlyTrusted
@@ -1191,5 +1238,5 @@ contract RiverRegistryTest is RiverRegistryTestSuite {
     * * * * * * * * * * * * * * * * * * * * * * * * */      
 
     // Make sure that migrations (1-200) can keep happening indefinitely,
-    // even as idCount progresses past the cutoff
+    // even as idCount progresses past the cutoff (think this is already tested)
 }

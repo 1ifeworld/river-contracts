@@ -199,6 +199,32 @@ abstract contract RiverRegistryTestSuite is TestSuiteSetup {
         return sig;                
     }        
 
+    function _preparePasskeySigForSmartWalletReturnSafeHash(CoinbaseSmartWallet _smartWallet, address recovery, IRiverRegistry.KeyInit[] memory keyInits, uint256 deadline) public view returns (bytes memory, bytes32) {
+        bytes32 riverRegistryRegisterForHash = riverRegistry.hashTypedDataV4(
+            keccak256(abi.encode(riverRegistry.REGISTER_TYPEHASH(), address(_smartWallet), recovery, keyInits, riverRegistry.nonces(address(_smartWallet)), deadline))
+        );        
+        bytes32 smartWalletSafeHash = _smartWallet.replaySafeHash(riverRegistryRegisterForHash);
+        WebAuthnInfo memory webAuthn = Utils.getWebAuthnStruct(smartWalletSafeHash);
+        (bytes32 r, bytes32 s) = vm.signP256(passkeyPrivateKey, webAuthn.messageHash);
+        s = bytes32(Utils.normalizeS(uint256(s)));
+        bytes memory sig = abi.encode(
+            CoinbaseSmartWallet.SignatureWrapper({
+                ownerIndex: 2,
+                signatureData: abi.encode(
+                    WebAuthn.WebAuthnAuth({
+                        authenticatorData: webAuthn.authenticatorData,
+                        clientDataJSON: webAuthn.clientDataJSON,
+                        typeIndex: 1,
+                        challengeIndex: 23,
+                        r: uint256(r),
+                        s: uint256(s)
+                    })
+                )
+            })
+        );
+        return (sig, smartWalletSafeHash);                
+    }            
+
     function _preparePasskey6492SigForSmartWallet(bytes[] memory _initialOwners, address recovery, IRiverRegistry.KeyInit[] memory keyInits, uint256 deadline)
         public
         returns (address, bytes memory)
@@ -252,4 +278,58 @@ abstract contract RiverRegistryTestSuite is TestSuiteSetup {
         );
         return (address(undeployedLocalAcct), sigFor6492);
     }
+
+    function _preparePasskey6492SigForSmartWalletReturnSafeHash(bytes[] memory _initialOwners, address recovery, IRiverRegistry.KeyInit[] memory keyInits, uint256 deadline)
+        public
+        returns (address, bytes memory, bytes32)
+    {
+        // this gets deterministic smart account address from factory
+        CoinbaseSmartWallet undeployedLocalAcct =
+            CoinbaseSmartWallet(payable(smartWalletFactory.getAddress(_initialOwners, 0)));
+
+        // this creates the hash that will be generated inside of id registry run time
+        bytes32 riverRegistryRegisterForHash = riverRegistry.hashTypedDataV4(
+            keccak256(abi.encode(riverRegistry.REGISTER_TYPEHASH(), address(undeployedLocalAcct), recovery, keyInits, riverRegistry.nonces(address(undeployedLocalAcct)), deadline))
+        );               
+        // this creates the hash that will be generated inside of smart account run time
+        ERC1271InputGenerator generator = new ERC1271InputGenerator(
+            undeployedLocalAcct,
+            riverRegistryRegisterForHash,
+            address(smartWalletFactory),
+            abi.encodeWithSignature("createAccount(bytes[],uint256)", _initialOwners, 0)
+        );
+        bytes32 smartWalletSafeHash = bytes32(address(generator).code);
+        // formats webauthn
+        WebAuthnInfo memory webAuthn = Utils.getWebAuthnStruct(smartWalletSafeHash);
+        // creates + cleans p256 sig
+        (bytes32 r, bytes32 s) = vm.signP256(passkeyPrivateKey, webAuthn.messageHash);
+        s = bytes32(Utils.normalizeS(uint256(s)));        
+        // creates encoded signature wrapper
+        bytes memory encodedSignatureWrapper = abi.encode(
+            CoinbaseSmartWallet.SignatureWrapper({
+                ownerIndex: 2,
+                signatureData: abi.encode(
+                    WebAuthn.WebAuthnAuth({
+                        authenticatorData: webAuthn.authenticatorData,
+                        clientDataJSON: webAuthn.clientDataJSON,
+                        typeIndex: 1,
+                        challengeIndex: 23,
+                        r: uint256(r),
+                        s: uint256(s)
+                    })
+                )
+            })
+        );        
+        // this creates the account init data that will be used to simulate deploy of smart account
+        bytes memory accountInitCalldata = abi.encodeCall(
+            CoinbaseSmartWalletFactory.createAccount,
+            (_initialOwners, 0) // owners, nonce
+        );        
+        // this creates the 6492 sig format that can be detected by verifiers suppriting 6492 verification
+        bytes memory sigFor6492 = bytes.concat(
+            abi.encode(address(smartWalletFactory), accountInitCalldata, encodedSignatureWrapper),
+            ERC6492_DETECTION_SUFFIX
+        );
+        return (address(undeployedLocalAcct), sigFor6492, smartWalletSafeHash);
+    }    
 }
