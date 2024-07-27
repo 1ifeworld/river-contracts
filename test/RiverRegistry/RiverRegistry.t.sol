@@ -1181,9 +1181,29 @@ contract RiverRegistryTest is RiverRegistryTestSuite {
     // REMOVE FOR
     //////////////////////////////////////////////////   
 
-    //////////////////////////////////////////////////
-    // ??? TRUSTED REMOVE FOR 
-    //////////////////////////////////////////////////                      
+    function test_sigRemoveFor() public {
+        // start prank as trusted caller
+        vm.startPrank(trusted.addr);
+
+        // process prep migration
+        _prepMigrateForAccounts(riverRegistry.RID_MIGRATION_CUTOFF());
+
+        IRiverRegistry.KeyInit[][] memory keyInits = generateKeyInits(1);   
+        uint256 issuedRid = riverRegistry.trustedRegisterFor(user.addr, recovery.addr, keyInits[0]);   
+
+        vm.stopPrank();
+        vm.startPrank(relayer.addr);                  
+
+        bytes memory removeSig = _signRemove(user.key, user.addr, keyInits[0][0].key, _deadline());
+        riverRegistry.removeFor(user.addr, keyInits[0][0].key, _deadline(), removeSig);
+
+        IRiverRegistry.KeyData memory keyData = riverRegistry.keyDataOf(issuedRid, keyInits[0][0].key);        
+        assertEq(uint256(keyData.state), uint256(IRiverRegistry.KeyState.REMOVED));
+        assertEq(riverRegistry.totalKeys(issuedRid, IRiverRegistry.KeyState.REMOVED), 1);
+        assertEq(riverRegistry.totalKeys(issuedRid, IRiverRegistry.KeyState.ADDED), 0);
+        bytes memory removedKey = riverRegistry.keyAt(issuedRid, IRiverRegistry.KeyState.REMOVED, 0);
+        assertEq(removedKey, keyInits[0][0].key);          
+    }                        
 
     /* * * * * * * * * * * * * * * * * * * * * * * * *
     *                                                *
@@ -1237,6 +1257,32 @@ contract RiverRegistryTest is RiverRegistryTestSuite {
     *                                                *
     * * * * * * * * * * * * * * * * * * * * * * * * */      
 
-    // Make sure that migrations (1-200) can keep happening indefinitely,
-    // even as idCount progresses past the cutoff (think this is already tested)
+    function test_migrateAfterMigrationCutoff() public {
+        // start prank as trusted caller
+        vm.startPrank(trusted.addr);
+
+        // cache migration cutoff
+        uint256 cutoff = riverRegistry.RID_MIGRATION_CUTOFF();
+
+        // process prep migration
+        _prepMigrateForAccounts(cutoff);        
+
+        IRiverRegistry.KeyInit[][] memory keyInits = generateKeyInits(1);  
+
+        // reigster new id
+        riverRegistry.trustedRegisterFor(randomishAccount(1000), recovery.addr, keyInits[0]);
+
+        // process 199 migrations and run tests
+        RiverRegistry.KeyInit[][] memory moreInits = generateKeyInits(cutoff);    
+        for (uint256 i; i < cutoff; ++i) {
+            address randomAccount2 = randomishAccount(cutoff + i);
+            address fromCustody = riverRegistry.custodyOf(i + 1);
+            riverRegistry.trustedMigrateFor(i + 1, randomAccount2, recovery.addr, moreInits[i]);            
+            assertEq(riverRegistry.idOf(randomAccount2), i + 1);
+            assertEq(riverRegistry.idOf(fromCustody), 0);
+            assertEq(riverRegistry.custodyOf(i + 1), randomAccount2);
+            assertEq(riverRegistry.recoveryOf(i + 1), recovery.addr);
+            assertEq(riverRegistry.hasMigrated(i + 1), true);
+        }        
+    }   
 }

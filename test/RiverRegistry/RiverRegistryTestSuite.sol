@@ -52,6 +52,19 @@ abstract contract RiverRegistryTestSuite is TestSuiteSetup {
 
     /* EOA STUFF */
 
+    function _signRemove(
+        uint256 pk,
+        address to,
+        bytes memory key,
+        uint256 deadline
+    ) internal view returns (bytes memory signature) {
+        address signer = vm.addr(pk);
+        bytes32 digest = riverRegistry.hashTypedDataV4(
+            keccak256(abi.encode(riverRegistry.REMOVE_TYPEHASH(), to, key, riverRegistry.nonces(signer), deadline))
+        );
+        signature = _sign(pk, digest);
+    }           
+
     function _signAdd(
         uint256 pk,
         address to,
