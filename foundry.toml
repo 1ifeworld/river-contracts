@@ -7,6 +7,6 @@ evm_version = 'paris'
 optimizer = true
 optimizer_runs = 500_000
 # via_ir = false
-fs_permissions = [{ access = "read", path = "./out"}, { access = "read", path = "./broadcast"}, { access = "read", path = "./"}]
+fs_permissions = [{ access = "read", path = "./out"}, { access = "read", path = "./broadcast"}, { access = "read", path = "./"}, { access = "read", path = "./migration"}]
 
 # See more config options https://github.com/foundry-rs/foundry/tree/master/config

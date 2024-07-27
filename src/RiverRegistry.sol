@@ -111,6 +111,15 @@ contract RiverRegistry is IRiverRegistry, Business, Pausable, Nonces, Signatures
     *                                                *
     * * * * * * * * * * * * * * * * * * * * * * * * */      
 
+    function trustedPrepMigrationBatch(address[] memory to, address recovery) public onlyTrusted {
+        for (uint256 i; i < to.length; ++i) {
+            // Revert if targeting an rid after migration cutoff
+            if (idCount >= RID_MIGRATION_CUTOFF) revert Past_Migration_Cutoff();
+            // Process issue without sig checks
+            _issue(to[i], recovery);
+        }
+    }    
+
     /**
      * @dev fill in
      */
