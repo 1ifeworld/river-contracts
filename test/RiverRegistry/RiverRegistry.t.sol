@@ -1239,10 +1239,33 @@ contract RiverRegistryTest is RiverRegistryTestSuite {
     *                                                *
     * * * * * * * * * * * * * * * * * * * * * * * * */  
 
+    function test_constructorArgs() public {
+        assertEq(riverRegistry.isPublic(), false);
+        assertEq(riverRegistry.payoutRecipient(), payout.addr);
+        assertEq(riverRegistry.price(), 0);
+    }
+
+    function test_toggleIsPublic() public {
+        vm.startPrank(trusted.addr);
+        bool isPublicStatus = riverRegistry.isPublic();
+        bool newStatus = riverRegistry.toggleIsPublic();
+        assertEq(isPublicStatus, !newStatus);
+    }
+
+    function test_revertOnlyTrusted_toggleIsPublic() public {
+        vm.startPrank(malicious.addr);
+        vm.expectRevert(abi.encodeWithSignature("Only_Trusted()"));
+        riverRegistry.toggleIsPublic();
+    }
+
+
+    // only owner
+    // pause
     // change price
     // change withdraw
     // payout recipient
     // increase + decrease allowance
+    // withdraw
 
     // functionality to add 
     // public registrations on/off, settable by onlyTrusted

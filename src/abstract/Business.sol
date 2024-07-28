@@ -123,7 +123,7 @@ abstract contract Business is Trust {
 
     function _unsafeSetPayoutRecipient(address _payoutRecipient) internal {
         if (_payoutRecipient == address(0)) revert Cannot_Set_Zero_Address();
-        payoutRecipient = payoutRecipient;
+        payoutRecipient = _payoutRecipient;
         emit SetPayoutRecipient(payoutRecipient);
     }
 
