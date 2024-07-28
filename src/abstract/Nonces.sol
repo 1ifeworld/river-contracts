@@ -1,16 +1,14 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.23;
 
-import {Nonces as NoncesBase} from "openzeppelin-contracts/utils/Nonces.sol";
-import {INonces} from "../interfaces/abstract/INonces.sol";
+import {Nonces as NoncesBase} from "@openzeppelin/utils/Nonces.sol";
 
-abstract contract Nonces is INonces, NoncesBase {
-    //////////////////////////////////////////////////
-    // NONCE MANAGEMENT
-    ////////////////////////////////////////////////// 
+abstract contract Nonces is NoncesBase {
 
     /**
-     * @inheritdoc INonces
+     * @notice Increase caller's nonce, invalidating previous signatures.
+     *
+     * @return uint256 The caller's new nonce.
      */
     function useNonce() external returns (uint256) {
         return _useNonce(msg.sender);
