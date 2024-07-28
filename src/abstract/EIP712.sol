@@ -6,10 +6,6 @@ import {EIP712 as EIP712Base} from "@openzeppelin/utils/cryptography/EIP712.sol"
 abstract contract EIP712 is EIP712Base {
     constructor(string memory name, string memory version) EIP712Base(name, version) {}
 
-    //////////////////////////////////////////////////
-    // EIP-712 HELPERS
-    ////////////////////////////////////////////////// 
-
     /**
      * @notice Helper view to read EIP-712 domain separator.
      *

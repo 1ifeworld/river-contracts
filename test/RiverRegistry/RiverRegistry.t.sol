@@ -3,7 +3,6 @@ pragma solidity 0.8.23;
 
 import {Test, console2} from "forge-std/Test.sol";
 import "../TestSuiteSetup.sol";
-
 import {CoinbaseSmartWalletFactory} from "@smart-wallet/CoinbaseSmartWalletFactory.sol";
 import {CoinbaseSmartWallet} from "@smart-wallet/CoinbaseSmartWallet.sol";
 import {RiverRegistry} from "../../src/RiverRegistry.sol";
@@ -14,11 +13,6 @@ import "./RiverRegistryTestSuite.sol";
 
 contract RiverRegistryTest is RiverRegistryTestSuite {       
 
-    /*
-        WIP notes
-        - 
-    */
-
     /* * * * * * * * * * * * * * * * * * * * * * * * *
     *                                                *
     *                                                *
@@ -27,7 +21,7 @@ contract RiverRegistryTest is RiverRegistryTestSuite {
     *                                                *
     * * * * * * * * * * * * * * * * * * * * * * * * */    
 
-    function test_constructor() public {
+    function test_constructor() public view {
         assertEq(riverRegistry.owner(), trusted.addr);
         assertEq(riverRegistry.payoutRecipient(), payout.addr);
         assertEq(riverRegistry.price(), 0);
@@ -1056,7 +1050,7 @@ contract RiverRegistryTest is RiverRegistryTestSuite {
         _prepMigrateForAccounts(riverRegistry.RID_MIGRATION_CUTOFF());
 
         IRiverRegistry.KeyInit[][] memory keyInits = generateKeyInits(1);   
-        uint256 issuedRid = riverRegistry.trustedRegisterFor(user.addr, recovery.addr, keyInits[0]);   
+        riverRegistry.trustedRegisterFor(user.addr, recovery.addr, keyInits[0]);   
 
         vm.stopPrank();
         vm.startPrank(malicious.addr);                  
@@ -1078,7 +1072,7 @@ contract RiverRegistryTest is RiverRegistryTestSuite {
         _prepMigrateForAccounts(riverRegistry.RID_MIGRATION_CUTOFF());
 
         IRiverRegistry.KeyInit[][] memory keyInits = generateKeyInits(1);   
-        uint256 issuedRid = riverRegistry.trustedRegisterFor(user.addr, recovery.addr, keyInits[0]);   
+        riverRegistry.trustedRegisterFor(user.addr, recovery.addr, keyInits[0]);   
 
         riverRegistry.pause();
         vm.stopPrank();
@@ -1267,7 +1261,7 @@ contract RiverRegistryTest is RiverRegistryTestSuite {
         riverRegistry.toggleIsPublic();
     }
 
-    function test_isTrustedCall() public {
+    function test_isTrustedCall() public view {
         // testing call made during setup
         assertEq(riverRegistry.isTrusted(relayer.addr), true);
     }    
@@ -1295,37 +1289,91 @@ contract RiverRegistryTest is RiverRegistryTestSuite {
     }            
 
     function test_setPrice() public {        
-        // trusted.addr is actually the owner
+        // both owner (trusted.addr) and trusted can call func
         vm.startPrank(trusted.addr); 
         uint256 newPrice = 1 ether;
         riverRegistry.setPrice(newPrice);
         assertEq(riverRegistry.price(), newPrice);
+        vm.stopPrank();
+        vm.startPrank(relayer.addr); 
+        uint256 secondNewPrice = 2 ether;
+        riverRegistry.setPrice(secondNewPrice);
+        assertEq(riverRegistry.price(), secondNewPrice);       
     }        
 
-    function test_revertOnlyOwner_setPrice() public {        
-        // relayer is trusted but not owner
-        vm.startPrank(relayer.addr); 
-        address[] memory accounts = new address[](1);
-        accounts[0] = relayer.addr;
-        bool[] memory statuses = new bool[](1);
-        statuses[0] = false;
-        vm.expectRevert();
-        riverRegistry.setTrusted(accounts, statuses);
+    function test_revertOnlyTrusted_setPrice() public {        
+        vm.startPrank(malicious.addr); 
+        vm.expectRevert(abi.encodeWithSignature("Only_Trusted()"));
+        riverRegistry.setPrice(1 ether);
     }     
 
+    function test_setPayoutRecipient() public {        
+        // both owner (trusted.addr) and trusted can call func
+        vm.startPrank(trusted.addr); 
+        address newPayout = address(0x888);
+        riverRegistry.setPayoutRecipient(newPayout);
+        assertEq(riverRegistry.payoutRecipient(), newPayout);
+        vm.stopPrank();
+        vm.startPrank(relayer.addr); 
+        address secondNewPayout = address(0x999);
+        riverRegistry.setPayoutRecipient(secondNewPayout);
+        assertEq(riverRegistry.payoutRecipient(), secondNewPayout);      
+    }        
 
-    // only owner
-    // pause
-    // change price
-    // change withdraw
-    // payout recipient
-    // increase + decrease allowance
-    // withdraw
+    function test_revertOnlyTrusted_setPayoutRecipient() public {        
+        vm.startPrank(malicious.addr); 
+        vm.expectRevert(abi.encodeWithSignature("Only_Trusted()"));
+        riverRegistry.setPayoutRecipient(address(888));
+    }         
 
-    // functionality to add 
-    // public registrations on/off, settable by onlyTrusted
-    // make these payable? to a recipient we can set? and we can upate the price?
-    // allowlist registrations from beginning, settable by onlyTrusted
+    function test_withdraw() public {        
+        // trusted.addr is owner
+        vm.startPrank(trusted.addr); 
+        vm.deal(address(riverRegistry), 1 ether);
+        riverRegistry.withdraw(.5 ether);
+        assertEq(address(riverRegistry).balance, .5 ether);      
+        assertEq(riverRegistry.payoutRecipient().balance, .5 ether);      
+    }        
+
+    function test_revertOnlyOwner_withdraw() public {        
+        vm.startPrank(malicious.addr); 
+        vm.deal(address(riverRegistry), 1 ether);
+        vm.expectRevert();
+        riverRegistry.withdraw(.5 ether);   
+    }        
+    
+    function test_increaseAllowance() public {        
+        // trusted.addr is owner
+        vm.startPrank(trusted.addr); 
+        riverRegistry.increaseAllowance(address(0x123), 5);
+        assertEq(riverRegistry.allowanceOf(address(0x123)), 5);     
+    }        
+
+    function test_revertOnlyTrusted_increaseAllowance() public {        
+        // trusted.addr is owner
+        vm.startPrank(malicious.addr); 
+        vm.expectRevert(abi.encodeWithSignature("Only_Trusted()"));
+        riverRegistry.increaseAllowance(address(0x123), 5);
+    }             
+
+
+    function test_revertOnlyTrusted_clearAllowance() public {        
+        // trusted.addr is owner
+        vm.startPrank(malicious.addr); 
+        vm.expectRevert(abi.encodeWithSignature("Only_Trusted()"));
+        riverRegistry.clearAllowance(address(0x123));
+    }             
+
+
+    function test_clearAllowance() public {        
+        // trusted.addr is owner
+        vm.startPrank(trusted.addr); 
+        riverRegistry.increaseAllowance(address(0x123), 5);
+        riverRegistry.clearAllowance(address(0x123));
+        assertEq(riverRegistry.allowanceOf(address(0x123)), 0);     
+    }        
+
+    // NOTE: function decreaseAllowance is tested in test_hasAllowance_register
 
     /* * * * * * * * * * * * * * * * * * * * * * * * *
     *                                                *

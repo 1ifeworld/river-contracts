@@ -2,12 +2,12 @@
 pragma solidity 0.8.23;
 
 import {Pausable} from "@openzeppelin/utils/Pausable.sol";
-import {IRiverRegistry} from "./interfaces/IRiverRegistry.sol";
-import {EnumerableKeySet, KeySet} from "./libraries/EnumerableKeySet.sol";
 import {Business} from "./abstract/Business.sol";
 import {EIP712} from "./abstract/EIP712.sol";
 import {Nonces} from "./abstract/Nonces.sol";
 import {Signatures} from "./abstract/Signatures.sol";
+import {IRiverRegistry} from "./interfaces/IRiverRegistry.sol";
+import {EnumerableKeySet, KeySet} from "./libraries/EnumerableKeySet.sol";
 
 /**
  * @title RiverRegistry
@@ -29,7 +29,7 @@ contract RiverRegistry is IRiverRegistry, Business, Pausable, Nonces, Signatures
 
     string public constant NAME = "RiverRegistry";
 
-    string public constant VERSION = "2024.08.26";
+    string public constant VERSION = "2024.07.28";
 
     bytes32 public constant REGISTER_TYPEHASH = 
         keccak256("Register(address to,address recovery,KeyData[] keys,uint256 nonce,uint256 deadline)");  
@@ -49,9 +49,17 @@ contract RiverRegistry is IRiverRegistry, Business, Pausable, Nonces, Signatures
     bytes32 public constant REMOVE_TYPEHASH =
         keccak256("Remove(address owner,bytes key,uint256 nonce,uint256 deadline)");        
 
+    /**
+     * @notice Marks the rid after which new registrations can begin
+     */
+    uint256 public constant RID_MIGRATION_CUTOFF = 200;        
+
+    /**
+     * @notice Maximum number of keys that can be in ADDED state at a given time for an rid
+     */
     uint256 public constant MAX_KEYS_PER_RID = 500;
 
-    uint256 public constant RID_MIGRATION_CUTOFF = 200;
+
 
     /* * * * * * * * * * * * * * * * * * * * * * * * *
     *                                                *
@@ -65,18 +73,48 @@ contract RiverRegistry is IRiverRegistry, Business, Pausable, Nonces, Signatures
     // IDS
     //////////////////////////////////////////////////  
 
+    /**
+     * @notice Last rid that was issued
+     */
     uint256 public idCount;
+
+    /**
+     * @notice Maps each address to an rid, or zero if it does not own an rid.
+     */
     mapping(address owner => uint256 rid) public idOf;
+
+    /**
+     * @notice Maps each rid to the address that currently owns it.
+     */
     mapping(uint256 rid => address owner) public custodyOf;
+
+    /**
+     * @notice Maps each rid to an address that can initiate a recovery.
+     */
     mapping(uint256 rid => address recovery) public recoveryOf;
+
+    /**
+     * @notice Maps each rid to status of whether it has been migrated.
+     */
     mapping(uint256 rid => bool migrated) public hasMigrated;
 
     //////////////////////////////////////////////////
     // KEYS
     //////////////////////////////////////////////////  
 
+    /**
+     * @notice Maps active keys per rid
+     */
     mapping(uint256 rid => KeySet activeKeys) internal _activeKeysByRid;
+
+    /**
+     * @notice Maps removed keys per rid
+     */    
     mapping(uint256 rid => KeySet removedKeys) internal _removedKeysByRid;    
+
+    /**
+     * @notice Maps rid to its keys and their data
+     */    
     mapping(uint256 rid => mapping(bytes key => KeyData data)) public keys;    
 
     /* * * * * * * * * * * * * * * * * * * * * * * * *
@@ -88,7 +126,7 @@ contract RiverRegistry is IRiverRegistry, Business, Pausable, Nonces, Signatures
     * * * * * * * * * * * * * * * * * * * * * * * * */      
 
     /**
-     * @dev fill in
+     * @dev Handles constructor calls documented in Business.sol and EIP712.sol
      */
     constructor(
         address initialOwner,
@@ -104,6 +142,12 @@ contract RiverRegistry is IRiverRegistry, Business, Pausable, Nonces, Signatures
     *                                                *
     * * * * * * * * * * * * * * * * * * * * * * * * */      
 
+    /**
+     * @notice Used to prep rids before migration cutoff to be migrated (batch)
+     *
+     * @param to        The addresses to issue rids to
+     * @param recovery  Account to grant recovery abilities to
+     */
     function trustedPrepMigrationBatch(address[] memory to, address recovery) public onlyTrusted {
         for (uint256 i; i < to.length; ++i) {
             // Revert if targeting an rid after migration cutoff
@@ -114,7 +158,10 @@ contract RiverRegistry is IRiverRegistry, Business, Pausable, Nonces, Signatures
     }    
 
     /**
-     * @dev fill in
+     * @notice Used to prep rids before migration cutoff to be migrated
+     *
+     * @param to        The addresses to issue rids to
+     * @param recovery  Account to grant recovery abilities to
      */
     function trustedPrepMigration(address to, address recovery) public onlyTrusted {
         // Revert if targeting an rid after migration cutoff
@@ -124,7 +171,12 @@ contract RiverRegistry is IRiverRegistry, Business, Pausable, Nonces, Signatures
     }
 
     /**
-     * @dev fill in
+     * @notice Used to migrate rids issues before migration cutoff
+     *
+     * @param rid        Target rid
+     * @param recipient  Account to migrate rid custody to
+     * @param recovery   Account to grant recovery abilities to
+     * @param keyInits   Initial keys to add for rid
      */
     function trustedMigrateFor(uint256 rid, address recipient, address recovery, KeyInit[] calldata keyInits) public onlyTrusted {
         // Revert if targeting an rid after migration cutoff
@@ -135,7 +187,7 @@ contract RiverRegistry is IRiverRegistry, Business, Pausable, Nonces, Signatures
         address fromCustody = _validateMigration(rid, recipient);
         // Transfer rid
         _unsafeTransfer(rid, fromCustody, recipient);
-        // Change recovery addresss
+        // Change recovery address
         _unsafeChangeRecovery(rid, recovery);
         // Add keys
         for (uint256 i; i < keyInits.length; ++i) {
@@ -171,19 +223,28 @@ contract RiverRegistry is IRiverRegistry, Business, Pausable, Nonces, Signatures
     //////////////////////////////////////////////////      
 
     /**
-     * @dev fill in
+     * @notice Used to issue new rid and add initial signing keys on behalf of msg.sender
+     *
+     * @param recovery   Account to grant recovery abilities to
+     * @param keyInits   Initial keys to add for rid
      */
     function register(address recovery, KeyInit[] calldata keyInits) external paid payable returns (uint256 rid) {
         // Check if recipient is allowed
         _isAllowed(msg.sender);
         // Process register and add
-        rid = _issueAndAdd(msg.sender, recovery, keyInits);
+        rid = _register(msg.sender, recovery, keyInits);
         // Decrease allowance if contract still !isPublic
         if (!isPublic) _unsafeDecreaseAllowance(msg.sender);
     }
 
     /**
-     * @dev fill in
+     * @notice Used to issue new rid and add initial signing keys on behalf of an account
+     *
+     * @param recipient  Account to migrate rid custody to
+     * @param recovery   Account to grant recovery abilities to
+     * @param keyInits   Initial keys to add for rid
+     * @param deadline   Expiration timestamp of the signature.
+     * @param sig        EIP-712 Transfer signature signed by the recipient address.
      */
     function registerFor(address recipient, address recovery, KeyInit[] calldata keyInits, uint256 deadline, bytes calldata sig) external paid payable returns (uint256 rid) {        
         // Revert if signature invalid
@@ -191,24 +252,30 @@ contract RiverRegistry is IRiverRegistry, Business, Pausable, Nonces, Signatures
         // Check if recipient is allowed
         _isAllowed(recipient);        
         // Process register and add
-        rid = _issueAndAdd(recipient, recovery, keyInits);
+        rid = _register(recipient, recovery, keyInits);
         // Decrease recipient allowance if contract still set to !isPublic
         if (!isPublic) _unsafeDecreaseAllowance(recipient);           
     }
 
-    // NOTE: add payable? without price check?
     /**
+     * @notice Used to issue new rid and add initial signing keys for any account.
+     *
+     * @dev Only callable by trusted caller
      * @dev Bypasses allowance checks + decreases
      * @dev Bypasses payment checks + spends
-     */    
+     *
+     * @param recovery   Account to grant recovery abilities to
+     * @param keyInits   Initial keys to add for rid
+     *
+     */     
     function trustedRegisterFor(address recipient, address recovery, KeyInit[] calldata keyInits) external onlyTrusted returns (uint256 rid) {
-        rid = _issueAndAdd(recipient, recovery, keyInits);
+        rid = _register(recipient, recovery, keyInits);
     }
 
     /**
-     * @dev fill in
+     * @notice Ensures migration cutoff has been reached, then processes rid issuance + key adding
      */
-    function _issueAndAdd(address _recipient, address _recovery, KeyInit[] calldata _keyInits) internal returns (uint256 rid) {
+    function _register(address _recipient, address _recovery, KeyInit[] calldata _keyInits) internal returns (uint256 rid) {
         // Cannot register until migration cutoff has been reached
         if (idCount < RID_MIGRATION_CUTOFF) revert Before_Migration_Cutoff();
         // Register rid
@@ -220,15 +287,16 @@ contract RiverRegistry is IRiverRegistry, Business, Pausable, Nonces, Signatures
     }
     
     /**
-     * @dev fill in
-     */    
+     * @notice Handles key issuance
+     */ 
     function _issue(address to, address recovery) internal returns (uint256 rid) {
         rid = _unsafeIssue(to, recovery);
         emit Issue(to, idCount, recovery);
     }
 
     /**
-     * @dev fill in
+     * @notice Updates necessary values during key issuance and checks if target already has rid
+     * @dev No checks on who can call, enforce elsewhere
      */
     function _unsafeIssue(address to, address recovery) internal whenNotPaused returns (uint256 rid) {
         // Revert if the target(to) has an rid 
@@ -245,11 +313,13 @@ contract RiverRegistry is IRiverRegistry, Business, Pausable, Nonces, Signatures
     // TRANSFER
     //////////////////////////////////////////////////      
 
-    /*
-    * `transfer()` functions can always be called by/on behalf an rid owner, as long as the contract isnt paused
-    * `transferAndChangeRecovery()` functions can always be called by/on behalf an rid owner, as long as the contract isnt paused
-    */
-
+   /**
+     * @notice Transfers an rid to another address
+     *
+     * @param to The address to transfer the rid to
+     * @param deadline Expiration timestamp of the signature
+     * @param toSig EIP-712 Transfer signature signed by the recipient address
+     */
     function transfer(address to, uint256 deadline, bytes calldata toSig) external {
         uint256 fromId = _validateTransfer(msg.sender, to);
 
@@ -259,6 +329,16 @@ contract RiverRegistry is IRiverRegistry, Business, Pausable, Nonces, Signatures
         _unsafeTransfer(fromId, msg.sender, to);
     }
 
+    /**
+     * @notice Transfers an rid on behalf of the sender and recipient
+     *
+     * @param from The address transferring the rid
+     * @param to The address to transfer the rid to
+     * @param fromDeadline Expiration timestamp of the sender's signature
+     * @param fromSig EIP-712 Transfer signature signed by the sender address
+     * @param toDeadline Expiration timestamp of the recipient's signature
+     * @param toSig EIP-712 Transfer signature signed by the recipient address
+     */
     function transferFor(
         address from,
         address to,
@@ -276,6 +356,14 @@ contract RiverRegistry is IRiverRegistry, Business, Pausable, Nonces, Signatures
         _unsafeTransfer(fromId, from, to);
     }
 
+    /**
+     * @notice Transfers an rid and changes the recovery address
+     *
+     * @param to The address to transfer the rid to
+     * @param recovery The new recovery address
+     * @param deadline Expiration timestamp of the signature
+     * @param sig EIP-712 Transfer and change recovery signature signed by the recipient address
+     */
     function transferAndChangeRecovery(address to, address recovery, uint256 deadline, bytes calldata sig) external {
         uint256 fromId = _validateTransfer(msg.sender, to);
 
@@ -293,6 +381,17 @@ contract RiverRegistry is IRiverRegistry, Business, Pausable, Nonces, Signatures
         _unsafeChangeRecovery(fromId, recovery);
     }
 
+    /**
+     * @notice Transfers an rid and changes the recovery address on behalf of the sender and recipient
+     *
+     * @param from The address transferring the rid
+     * @param to The address to transfer the rid to
+     * @param recovery The new recovery address
+     * @param fromDeadline Expiration timestamp of the from signature
+     * @param fromSig EIP-712 Transfer and change recovery signature signed by the sender address
+     * @param toDeadline Expiration timestamp of the recipient's signature
+     * @param toSig EIP-712 Transfer and change recovery signature signed by the recipient address
+     */
     function transferAndChangeRecoveryFor(
         address from,
         address to,
@@ -339,7 +438,7 @@ contract RiverRegistry is IRiverRegistry, Business, Pausable, Nonces, Signatures
     }
 
     /**
-     * @dev Transfer the rid to another address without checking invariants.
+     * @dev Transfer an rid to another address without checking invariants.
      * @dev Will revert if contract is paused     
      */
     function _unsafeTransfer(uint256 id, address from, address to) internal whenNotPaused {
@@ -354,10 +453,11 @@ contract RiverRegistry is IRiverRegistry, Business, Pausable, Nonces, Signatures
     // CHANGE RECOVERY
     //////////////////////////////////////////////////      
 
-    /*
-    * `changeRecovery()` functions can always be called by/on behalf an rid owner, as long as the contract isnt paused
-    */     
-
+    /**
+     * @notice Changes the recovery address for the caller's rid
+     *
+     * @param recovery The new recovery address
+     */
     function changeRecoveryAddress(address recovery) external {
         // Revert if the caller does not own an rid
         uint256 ownerId = idOf[msg.sender];
@@ -366,6 +466,14 @@ contract RiverRegistry is IRiverRegistry, Business, Pausable, Nonces, Signatures
         _unsafeChangeRecovery(ownerId, recovery);
     }
 
+    /**
+     * @notice Changes the recovery address on behalf of rid custody address
+     *
+     * @param owner Custody address of rid
+     * @param recovery The new recovery address
+     * @param deadline Expiration timestamp of the signature
+     * @param sig EIP-712 Change recovery address signature signed by rid custody address
+     */
     function changeRecoveryAddressFor(
         address owner,
         address recovery,
@@ -400,12 +508,16 @@ contract RiverRegistry is IRiverRegistry, Business, Pausable, Nonces, Signatures
 
     //////////////////////////////////////////////////
     // RECOVER
-    //////////////////////////////////////////////////          
+    //////////////////////////////////////////////////             
 
-    /*
-    * `recover()` functions can always be called by the by/on behalf of recovery address, as long as the contract isnt paused
-    */        
-
+    /**
+     * @notice Recovers the rid on behalf of the recovery address
+     *
+     * @param from The address currently owning the rid
+     * @param to The address to transfer the rid to
+     * @param deadline Expiration timestamp of the signature
+     * @param sig EIP-712 Transfer signature signed by the recipient address
+     */
     function recover(address from, address to, uint256 deadline, bytes calldata sig) external {
         // Revert if from does not own an rid
         uint256 fromId = idOf[from];
@@ -426,6 +538,16 @@ contract RiverRegistry is IRiverRegistry, Business, Pausable, Nonces, Signatures
         _unsafeTransfer(fromId, from, to);
     }
 
+    /**
+     * @notice Recovers the rid on behalf of the recovery address and recipient
+     *
+     * @param from The address currently owning the rid
+     * @param to The address to transfer the rid to
+     * @param recoveryDeadline Expiration timestamp of the recovery signature
+     * @param recoverySig EIP-712 Transfer signature signed by the recovery address
+     * @param toDeadline Expiration timestamp of the recipient's signature
+     * @param toSig EIP-712 Transfer signature signed by the recipient address
+     */
     function recoverFor(
         address from,
         address to,
@@ -461,13 +583,12 @@ contract RiverRegistry is IRiverRegistry, Business, Pausable, Nonces, Signatures
     // ADD KEY
     ////////////////////////////////////////////////////////////////   
 
-    /*
-    * `add()` functions can always be called by the by/on behalf of rid owner, as long as the contract isnt paused
-    */         
-
     /**
-     * @dev No signature checks performed
+     * @notice Adds a new key for the a given rid
      * @dev Only callable by trusted caller
+     *
+     * @param keyType The type of the key to add
+     * @param key The key data to add
      */
     function trustedAddFor(
         address ridOwner,
@@ -477,7 +598,12 @@ contract RiverRegistry is IRiverRegistry, Business, Pausable, Nonces, Signatures
         _add(_ridOf(ridOwner), keyType, key);
     }   
 
-    // No isAllowed check hear on purpose
+    /**
+     * @notice Adds a new key for the caller's rid
+     *
+     * @param keyType The type of the key to add
+     * @param key The key data to add
+     */
     function add(
         uint32 keyType,
         bytes calldata key
@@ -485,7 +611,15 @@ contract RiverRegistry is IRiverRegistry, Business, Pausable, Nonces, Signatures
         _add(_ridOf(msg.sender), keyType, key);
     }
 
-    // No isAllowed check hear on purpose
+   /**
+     * @notice Adds a new key for the for an rid on behalf of its custody address
+     *
+     * @param ridOwner The address owning the rid
+     * @param keyType The type of the key to add
+     * @param key The key data to add
+     * @param deadline Expiration timestamp of the signature
+     * @param sig EIP-712 Add key signature signed by the rid custody address
+     */
     function addFor(
         address ridOwner,
         uint32 keyType,
@@ -499,7 +633,7 @@ contract RiverRegistry is IRiverRegistry, Business, Pausable, Nonces, Signatures
     }        
 
     /**
-     * @dev fill in
+     * @notice Processes checks and storage updates when adding keys
      */
     function _add(
         uint256 rid,
@@ -517,25 +651,35 @@ contract RiverRegistry is IRiverRegistry, Business, Pausable, Nonces, Signatures
         emit Add(rid, keyType, key, key);
     }                 
 
+    
     /**
-     * @dev fill in
-     */
+     * @notice Wrapper around functionality provided by EnumerableKeySet.sol
+     */    
     function _addToKeySet(uint256 rid, bytes calldata key) internal virtual {
         _activeKeysByRid[rid].add(key);
     }
 
     //////////////////////////////////////////////////
     // REMOVE KEY
-    //////////////////////////////////////////////////   
+    //////////////////////////////////////////////////            
 
-    /*
-    * `remove()` functions can always be called by the by/on behalf of rid owner, as long as the contract isnt paused
-    */               
-
+    /**
+     * @notice Removes a key for the caller's rid
+     *
+     * @param key The key data to remove
+     */
     function remove(bytes calldata key) external {
         _remove(_ridOf(msg.sender), key);
     }    
 
+    /**
+     * @notice Removes a key for the specified rid owner
+     *
+     * @param ridOwner The address owning the rid
+     * @param key The key data to remove
+     * @param deadline Expiration timestamp of the signature
+     * @param sig EIP-712 Remove key signature signed by the rid owner
+     */
     function removeFor(
         address ridOwner,
         bytes calldata key,
@@ -546,6 +690,9 @@ contract RiverRegistry is IRiverRegistry, Business, Pausable, Nonces, Signatures
         _remove(_ridOf(ridOwner), key);
     }    
 
+    /**
+     * @notice Processes checks and storage updates when removing keys
+     */
     function _remove(uint256 rid, bytes calldata key) internal whenNotPaused {
         KeyData storage keyData = keys[rid][key];
         if (keyData.state != KeyState.ADDED) revert Invalid_Key_State();
@@ -556,8 +703,8 @@ contract RiverRegistry is IRiverRegistry, Business, Pausable, Nonces, Signatures
     }   
 
     /**
-     * @dev fill in
-     */
+     * @notice Wrapper around functionality provided by EnumerableKeySet.sol
+     */   
     function _removeFromKeySet(uint256 rid, bytes calldata key) internal virtual {
         _activeKeysByRid[rid].remove(key);
         _removedKeysByRid[rid].add(key);
@@ -566,18 +713,6 @@ contract RiverRegistry is IRiverRegistry, Business, Pausable, Nonces, Signatures
     ////////////////////////////////////////////////////////////////
     // VIEWS
     ////////////////////////////////////////////////////////////////   
-
-    // NOTE: might have to redo this function since it cant be
-    //       `view` anymore because of 6492 compatability which simulates a deploy
-    function verifyRidSignature(
-        address custodyAddress,
-        uint256 rid,
-        bytes32 digest,
-        bytes calldata sig
-    ) external returns (bool isValid) {
-        _verifySig(digest, custodyAddress, sig);
-        isValid = idOf[custodyAddress] == rid;
-    }
 
     function _ridOf(address ridOwner) internal view returns (uint256 rid) {
         rid = idOf[ridOwner];
@@ -644,10 +779,16 @@ contract RiverRegistry is IRiverRegistry, Business, Pausable, Nonces, Signatures
     *                                                *
     * * * * * * * * * * * * * * * * * * * * * * * * */  
 
+    /**
+     * @notice Freezes all id + key state updates in contract
+     */   
     function pause() external onlyOwner {
         _pause();
     }
 
+    /**
+     * @notice Unfreezes all id + key state updates in contract
+     */   
     function unpause() external onlyOwner {
         _unpause();
     }
@@ -658,7 +799,17 @@ contract RiverRegistry is IRiverRegistry, Business, Pausable, Nonces, Signatures
     *              SIGNATURE HELPERS                 *
     *                                                *
     *                                                *
-    * * * * * * * * * * * * * * * * * * * * * * * * */  
+    * * * * * * * * * * * * * * * * * * * * * * * * */
+
+    function verifyRidSignature(
+        address custodyAddress,
+        uint256 rid,
+        bytes32 digest,
+        bytes calldata sig
+    ) external returns (bool isValid) {
+        _verifySig(digest, custodyAddress, sig);
+        isValid = idOf[custodyAddress] == rid;
+    }      
 
     function _verifyRegisterSig(address signer, address recovery, KeyInit[] calldata keyInits, uint256 deadline, bytes memory sig) internal {
         _verifySigWithDeadline(

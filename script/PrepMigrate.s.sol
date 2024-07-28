@@ -1,14 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.23;
 
-import {JSONParserLib} from "@solady/utils/JSONParserLib.sol";
 import "forge-std/Script.sol";
 import {console2} from "forge-std/Test.sol";
 import {stdJson} from "forge-std/StdJson.sol";
 
 import {RiverRegistry} from "../src/RiverRegistry.sol";
 
-contract FileScript is Script {
+contract PrepMigrateScript is Script {
 
     RiverRegistry public riverRegistry;
     address public mockRecoveryAddress = address(0x11111111);
@@ -20,13 +19,13 @@ contract FileScript is Script {
     }
 
     function setUp() public {
-        riverRegistry = RiverRegistry(payable(0x291a34a9F686D4f509FC77E3756d66B206E002f8));
+        riverRegistry = RiverRegistry(payable(0x7B17A93373e2E862Fa5f4A78F4dc25C6210e990C));
     }
 
     function run() public {
         bytes32 privateKeyBytes = vm.envBytes32("PRIVATE_KEY");
         uint256 deployerPrivateKey = uint256(privateKeyBytes);
-        VmSafe.Wallet memory deployerWallet = vm.createWallet(deployerPrivateKey);
+        vm.createWallet(deployerPrivateKey);
         vm.startBroadcast(deployerPrivateKey);
 
         json = vm.readFile("./migration/240726_Custody.JSON");
@@ -35,33 +34,21 @@ contract FileScript is Script {
         // Decode data into custody set
         CustodySet memory custodySet = abi.decode(data, (CustodySet));
 
-        // first 50
-        address[] memory first50 = new address[](50);
-        for (uint256 i; i < 50; ++i) {
-            first50[i] = custodySet.wallets[i];
-        }
-        // second 50
-        address[] memory second50 = new address[](50);
-        for (uint256 i; i < 50; ++i) {
-            second50[i] = custodySet.wallets[i + 50];
-        }        
-        // third 50
-        address[] memory third50 = new address[](50);
-        for (uint256 i; i < 50; ++i) {
-            third50[i] = custodySet.wallets[i + 100];
-        }                
+        // // first 50
+        // address[] memory first50 = new address[](50);
+        // for (uint256 i; i < 50; ++i) {
+        //     first50[i] = custodySet.wallets[i];
+        // }             
 
         riverRegistry.trustedPrepMigrationBatch(custodySet.wallets, mockRecoveryAddress);
-        // riverRegistry.trustedPrepMigrationBatch(first50, mockRecoveryAddress);
-        // riverRegistry.trustedPrepMigrationBatch(second50, mockRecoveryAddress);
-        // riverRegistry.trustedPrepMigrationBatch(third50, mockRecoveryAddress);
+
 
         vm.stopBroadcast();
     }
 }
 // ======= SCRIPTS =====
 // source .env
-// forge script script/File.s.sol:FileScript -vvvv --rpc-url $BASE_SEPOLIA_RPC_URL --broadcast
+// forge script script/PrepMigrate.s.sol:PrepMigrateScript -vvvv --rpc-url $BASE_SEPOLIA_RPC_URL --broadcast
 
 /*
   Txn analysis, prepMigrateBatch 50 wallets
