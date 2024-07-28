@@ -92,16 +92,9 @@ contract RiverRegistry is IRiverRegistry, Business, Pausable, Nonces, Signatures
      */
     constructor(
         address initialOwner,
-        address[] memory initialTrustedCallers,
         address payoutRecipient,
         uint256 price
-    ) Business(initialOwner, payoutRecipient, price) EIP712("RiverRegistry", "1") {
-        bool[] memory trues = new bool[](initialTrustedCallers.length);
-        for (uint256 i; i < initialTrustedCallers.length; ++i) {
-            trues[i] = true;
-        }
-        _setTrusted(initialTrustedCallers, trues);
-    }  
+    ) Business(initialOwner, payoutRecipient, price) EIP712("RiverRegistry", "1") {}  
 
     /* * * * * * * * * * * * * * * * * * * * * * * * *
     *                                                *

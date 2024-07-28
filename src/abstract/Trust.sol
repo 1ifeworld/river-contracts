@@ -1,13 +1,18 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.23;
 
-import {Ownable2Step} from "@openzeppelin/access/Ownable2Step.sol";
 import {Ownable} from "@openzeppelin/access/Ownable.sol";
+import {Ownable2Step} from "@openzeppelin/access/Ownable2Step.sol";
 
 abstract contract Trust is Ownable2Step {
-    /*//////////////////////////////////////////////////////////////
-                                 ERRORS
-    //////////////////////////////////////////////////////////////*/
+
+    /* * * * * * * * * * * * * * * * * * * * * * * * *
+    *                                                *
+    *                                                *
+    *                     ERRORS                     *
+    *                                                *
+    *                                                *
+    * * * * * * * * * * * * * * * * * * * * * * * * */    
 
     /// @dev Revert on array length mismatch
     error Input_Length_Mismatch();
@@ -15,12 +20,16 @@ abstract contract Trust is Ownable2Step {
     /// @dev Revert when an unauthorized caller calls a trusted function.
     error Only_Trusted();
 
-    /// @dev Revert when an invalid address is provided as input.
-    error Invalid_Address();
+    /// @dev Revert when zero address is provided as input.
+    error Cannot_Set_Zero_Address();
 
-    /*//////////////////////////////////////////////////////////////
-                                 EVENTS
-    //////////////////////////////////////////////////////////////*/
+    /* * * * * * * * * * * * * * * * * * * * * * * * *
+    *                                                *
+    *                                                *
+    *                     EVENTS                     *
+    *                                                *
+    *                                                *
+    * * * * * * * * * * * * * * * * * * * * * * * * */  
 
     /**
      * @dev Emit an event when a trusted caller is modified.
@@ -31,18 +40,26 @@ abstract contract Trust is Ownable2Step {
      */
     event SetTrusted(address indexed account, bool indexed status, address owner);
 
-    /*//////////////////////////////////////////////////////////////
-                              STORAGE
-    //////////////////////////////////////////////////////////////*/
+    /* * * * * * * * * * * * * * * * * * * * * * * * *
+    *                                                *
+    *                                                *
+    *                    STORAGE                     *
+    *                                                *
+    *                                                *
+    * * * * * * * * * * * * * * * * * * * * * * * * */  
 
     /**
      * @dev Tracks what addresses are allowed to call `trusted` functions
      */
     mapping(address => bool) public isTrusted;
 
-    /*//////////////////////////////////////////////////////////////
-                               MODIFIERS
-    //////////////////////////////////////////////////////////////*/
+    /* * * * * * * * * * * * * * * * * * * * * * * * *
+    *                                                *
+    *                                                *
+    *                   MODIFIERS                    *
+    *                                                *
+    *                                                *
+    * * * * * * * * * * * * * * * * * * * * * * * * */  
 
 
     /**
@@ -54,50 +71,46 @@ abstract contract Trust is Ownable2Step {
         }
         _;
     }
+    /* * * * * * * * * * * * * * * * * * * * * * * * *
+    *                                                *
+    *                                                *
+    *                  CONSTRUCTOR                   *
+    *                                                *
+    *                                                *
+    * * * * * * * * * * * * * * * * * * * * * * * * */  
 
-    /*//////////////////////////////////////////////////////////////
-                               CONSTRUCTOR
-    //////////////////////////////////////////////////////////////*/
-
-    // /**
-    //  * @param _initialOwner Initial contract owner address.
-    //  */
+    /**
+     * @param _initialOwner Initial contract owner address.
+     */
     constructor(address _initialOwner) Ownable(_initialOwner) {}
 
-    // /**
-    //  * @param _initialOwner Initial contract owner address.
-    //  */
-    // constructor(address _initialOwner) Ownable2Step(_initialOwner) {}    
-
-    /*//////////////////////////////////////////////////////////////
-                         PERMISSIONED ACTIONS
-    //////////////////////////////////////////////////////////////*/
+    /* * * * * * * * * * * * * * * * * * * * * * * * *
+    *                                                *
+    *                                                *
+    *                  SET TRUSTED                   *
+    *                                                *
+    *                                                *
+    * * * * * * * * * * * * * * * * * * * * * * * * */  
 
     /**
-     * @notice Change the trusted caller by calling this from the contract's owner.
+     * @notice Change trusted accounts by calling this from the contract's owner.
      *
-     * @param accounts Accounts to update trusted caller status
-     * @param statuses Boolean values to update accounts with
+     * @param accounts Accounts to update trusted status
+     * @param statuses Status values to update accounts with
      */
     function setTrusted(address[] memory accounts, bool[] memory statuses) public onlyOwner {
-        _setTrusted(accounts, statuses);
+        _setTrusted(msg.sender, accounts, statuses);
     }
 
-    /*//////////////////////////////////////////////////////////////
-                         INTERNAL FUNCTIONS
-    //////////////////////////////////////////////////////////////*/
-
     /**
-     * @dev Internal helper to set trusted caller. Can be used internally
-     *      to set the trusted caller at construction time.
+     * @dev Internal helper to update `isTrusted` values
      */
-    function _setTrusted(address[] memory _accounts, bool[] memory _statuses) internal {
-        address sender = msg.sender;
+    function _setTrusted(address _sender, address[] memory _accounts, bool[] memory _statuses) internal {
         if (_accounts.length != _statuses.length) revert Input_Length_Mismatch();
         for (uint256 i = 0; i < _accounts.length; ++i) {
-            if (_accounts[i] == address(0)) revert Invalid_Address();
+            if (_accounts[i] == address(0)) revert Cannot_Set_Zero_Address();
             isTrusted[_accounts[i]] = _statuses[i];
-            emit SetTrusted(_accounts[i], _statuses[i], sender);
+            emit SetTrusted(_accounts[i], _statuses[i], _sender);
         }
     }
 }

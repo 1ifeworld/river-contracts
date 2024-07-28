@@ -22,6 +22,21 @@ contract RiverRegistryTest is RiverRegistryTestSuite {
     /* * * * * * * * * * * * * * * * * * * * * * * * *
     *                                                *
     *                                                *
+    *               INITIALIZATION                   *
+    *                                                *
+    *                                                *
+    * * * * * * * * * * * * * * * * * * * * * * * * */    
+
+    function test_constructor() public {
+        assertEq(riverRegistry.owner(), trusted.addr);
+        assertEq(riverRegistry.payoutRecipient(), payout.addr);
+        assertEq(riverRegistry.price(), 0);
+        assertEq(riverRegistry.isPublic(), false);
+    }    
+
+    /* * * * * * * * * * * * * * * * * * * * * * * * *
+    *                                                *
+    *                                                *
     *                ID MIGRATION                    *
     *                                                *
     *                                                *
@@ -1239,12 +1254,6 @@ contract RiverRegistryTest is RiverRegistryTestSuite {
     *                                                *
     * * * * * * * * * * * * * * * * * * * * * * * * */  
 
-    function test_constructorArgs() public {
-        assertEq(riverRegistry.isPublic(), false);
-        assertEq(riverRegistry.payoutRecipient(), payout.addr);
-        assertEq(riverRegistry.price(), 0);
-    }
-
     function test_toggleIsPublic() public {
         vm.startPrank(trusted.addr);
         bool isPublicStatus = riverRegistry.isPublic();
@@ -1257,6 +1266,52 @@ contract RiverRegistryTest is RiverRegistryTestSuite {
         vm.expectRevert(abi.encodeWithSignature("Only_Trusted()"));
         riverRegistry.toggleIsPublic();
     }
+
+    function test_isTrustedCall() public {
+        // testing call made during setup
+        assertEq(riverRegistry.isTrusted(relayer.addr), true);
+    }    
+
+    function test_setTrusted() public {        
+        // trusted.addr is actually the owner
+        vm.startPrank(trusted.addr); 
+        address[] memory accounts = new address[](1);
+        accounts[0] = relayer.addr;
+        bool[] memory statuses = new bool[](1);
+        statuses[0] = false;
+        riverRegistry.setTrusted(accounts, statuses);
+        assertEq(riverRegistry.isTrusted(relayer.addr), false);
+    }        
+
+    function test_revertOnlyOwner_setTrusted() public {        
+        // relayer is trusted but not owner
+        vm.startPrank(relayer.addr); 
+        address[] memory accounts = new address[](1);
+        accounts[0] = relayer.addr;
+        bool[] memory statuses = new bool[](1);
+        statuses[0] = false;
+        vm.expectRevert();
+        riverRegistry.setTrusted(accounts, statuses);
+    }            
+
+    function test_setPrice() public {        
+        // trusted.addr is actually the owner
+        vm.startPrank(trusted.addr); 
+        uint256 newPrice = 1 ether;
+        riverRegistry.setPrice(newPrice);
+        assertEq(riverRegistry.price(), newPrice);
+    }        
+
+    function test_revertOnlyOwner_setPrice() public {        
+        // relayer is trusted but not owner
+        vm.startPrank(relayer.addr); 
+        address[] memory accounts = new address[](1);
+        accounts[0] = relayer.addr;
+        bool[] memory statuses = new bool[](1);
+        statuses[0] = false;
+        vm.expectRevert();
+        riverRegistry.setTrusted(accounts, statuses);
+    }     
 
 
     // only owner

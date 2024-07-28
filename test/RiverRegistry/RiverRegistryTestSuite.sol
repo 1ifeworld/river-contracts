@@ -15,10 +15,17 @@ abstract contract RiverRegistryTestSuite is TestSuiteSetup {
     address[] trustedCallers;
 
     function setUp() public virtual override {
-        super.setUp();
+        super.setUp();           
+        riverRegistry = new RiverRegistry(trusted.addr, payout.addr, 0);
+        vm.startPrank(riverRegistry.owner());
         trustedCallers = new address[](1);
         trustedCallers[0] = relayer.addr;
-        riverRegistry = new RiverRegistry(trusted.addr, trustedCallers, payout.addr, 0);
+        bool[] memory trues = new bool[](trustedCallers.length);
+        for (uint256 i; i < trustedCallers.length; ++i) {
+            trues[i] = true;
+        }        
+        riverRegistry.setTrusted(trustedCallers, trues);
+        vm.stopPrank();
     }
 
     //////////////////////////////////////////////////

@@ -19,15 +19,20 @@ contract RiverRegistryScript is Script {
         uint256 deployerPrivateKey = uint256(privateKeyBytes);
         VmSafe.Wallet memory deployerWallet = vm.createWallet(deployerPrivateKey);
 
-        vm.startBroadcast(deployerPrivateKey);
-
-        // prep inputs
-        address[] memory trustedCallerForRiverRegistry = new address[](2);
-        trustedCallerForRiverRegistry[0] = deployerWallet.addr;
-        trustedCallerForRiverRegistry[1] = syndicateEoa;        
+        vm.startBroadcast(deployerPrivateKey);    
         
         // deploy riverRegistry
-        riverRegistry = new RiverRegistry(deployerWallet.addr, trustedCallerForRiverRegistry, startingPayoutRecipient, startingPrice);  
+        riverRegistry = new RiverRegistry(deployerWallet.addr, startingPayoutRecipient, startingPrice);  
+
+        // set trusted callers
+        address[] memory trustedCallersForRiverRegistry = new address[](2);
+        trustedCallersForRiverRegistry[0] = deployerWallet.addr;
+        trustedCallersForRiverRegistry[1] = syndicateEoa;        
+        bool[] memory trues = new bool[](trustedCallersForRiverRegistry.length);
+        for (uint256 i; i < trustedCallersForRiverRegistry.length; ++i) {
+            trues[i] = true;
+        }      
+        riverRegistry.setTrusted(trustedCallersForRiverRegistry, trues);
 
         vm.stopBroadcast();
     }
