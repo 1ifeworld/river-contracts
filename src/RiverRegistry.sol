@@ -59,8 +59,6 @@ contract RiverRegistry is IRiverRegistry, Business, Pausable, Nonces, Signatures
      */
     uint256 public constant MAX_KEYS_PER_RID = 500;
 
-
-
     /* * * * * * * * * * * * * * * * * * * * * * * * *
     *                                                *
     *                                                *
