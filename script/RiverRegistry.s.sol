@@ -9,7 +9,7 @@ contract RiverRegistryScript is Script {
 
     RiverRegistry public riverRegistry;
     uint256 startingPrice = 0;
-    address startingPayoutRecipient = 0xC1fA1105e2b9Ca12d04676f4841479f106f3095e; // switch to real SAFE
+    address startingPayoutRecipient = 0xC1fA1105e2b9Ca12d04676f4841479f106f3095e;
     address public syndicateEoa = 0x10826C01a27B5E655853d2C54078935DDB374e32;
     
     function setUp() public {}
@@ -37,7 +37,7 @@ contract RiverRegistryScript is Script {
         vm.stopBroadcast();
     }
 }
+
 // ======= DEPLOY SCRIPTS =====
 // source .env
 // forge script script/RiverRegistry.s.sol:RiverRegistryScript -vvvv --rpc-url $BASE_SEPOLIA_RPC_URL --broadcast --verify --verifier-url https://api-sepolia.basescan.org/api --etherscan-api-key $BASESCAN_API_KEY
-// forge script script/IdRegistry.s.sol:IdRegistryScript -vvvv --broadcast --fork-url http://localhost:8545

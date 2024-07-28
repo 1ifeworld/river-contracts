@@ -46,15 +46,7 @@ contract PrepMigrateScript is Script {
         vm.stopBroadcast();
     }
 }
+
 // ======= SCRIPTS =====
 // source .env
 // forge script script/PrepMigrate.s.sol:PrepMigrateScript -vvvv --rpc-url $BASE_SEPOLIA_RPC_URL --broadcast
-
-/*
-  Txn analysis, prepMigrateBatch 50 wallets
-    - Estimated gas price: 13.601518797 gwei
-    - Estimated total gas used for script: 4884712
-    - Estimated amount required: 0.066439502085931464 ETH 
-    - Success hash: 0x1615d50837855cc7022712667480f055d798446454ece5bdda0ef343f92012de
-    - Paid: 0.02525423452717868 ETH (3536444 gas * 7.14113797 gwei)
-*/
