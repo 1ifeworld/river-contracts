@@ -14,12 +14,13 @@ contract PrepMigrateScript is Script {
     string fileContents;
     string json;
     bytes data;
+
     struct CustodySet {
         address[] wallets;
     }
 
     function setUp() public {
-        riverRegistry = RiverRegistry(payable(0xBe6B19b7ce0cD514bAF3615CD763a26514144557));
+        riverRegistry = RiverRegistry(payable(0x1c83e2Ab421eAa3B089E6610084d61E92EA649F1));
     }
 
     function run() public {
@@ -28,17 +29,11 @@ contract PrepMigrateScript is Script {
         vm.createWallet(deployerPrivateKey);
         vm.startBroadcast(deployerPrivateKey);
 
-        json = vm.readFile("./migration/240801_Custody.json");
+        json = vm.readFile("./migration/FULLWALLETS.json");
         data = vm.parseJson(json);
 
         // Decode data into custody set
-        CustodySet memory custodySet = abi.decode(data, (CustodySet));
-
-        // // first 50
-        // address[] memory first50 = new address[](50);
-        // for (uint256 i; i < 50; ++i) {
-        //     first50[i] = custodySet.wallets[i];
-        // }             
+        CustodySet memory custodySet = abi.decode(data, (CustodySet));         
 
         riverRegistry.trustedPrepMigrationBatch(custodySet.wallets, mockRecoveryAddress);
 

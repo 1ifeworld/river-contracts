@@ -52,7 +52,7 @@ contract RiverRegistry is IRiverRegistry, Business, Pausable, Nonces, Signatures
     /**
      * @notice Marks the rid after which new registrations can begin
      */
-    uint256 public constant RID_MIGRATION_CUTOFF = 203;        
+    uint256 public constant RID_MIGRATION_CUTOFF = 208;        
 
     /**
      * @notice Maximum number of keys that can be in ADDED state at a given time for an rid
