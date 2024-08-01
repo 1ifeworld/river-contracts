@@ -29,7 +29,7 @@ contract RiverRegistry is IRiverRegistry, Business, Pausable, Nonces, Signatures
 
     string public constant NAME = "RiverRegistry";
 
-    string public constant VERSION = "2024.07.28";
+    string public constant VERSION = "2024.08.01";
 
     bytes32 public constant REGISTER_TYPEHASH = 
         keccak256("Register(address to,address recovery,KeyData[] keys,uint256 nonce,uint256 deadline)");  
@@ -52,7 +52,7 @@ contract RiverRegistry is IRiverRegistry, Business, Pausable, Nonces, Signatures
     /**
      * @notice Marks the rid after which new registrations can begin
      */
-    uint256 public constant RID_MIGRATION_CUTOFF = 200;        
+    uint256 public constant RID_MIGRATION_CUTOFF = 208;        
 
     /**
      * @notice Maximum number of keys that can be in ADDED state at a given time for an rid
