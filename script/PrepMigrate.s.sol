@@ -19,9 +19,7 @@ contract PrepMigrateScript is Script {
     }
 
     function setUp() public {
-        // riverRegistry = RiverRegistry(payable(0x7B17A93373e2E862Fa5f4A78F4dc25C6210e990C));
-        // riverRegistry = RiverRegistry(payable(0x111dec3610c4ceE5291e4aEF4DeAB6FE394a03Cd));
-        riverRegistry = RiverRegistry(payable(0xAD74EfC3d72945eC82c8DaD7535E59670677f502));
+        riverRegistry = RiverRegistry(payable(0xBe6B19b7ce0cD514bAF3615CD763a26514144557));
     }
 
     function run() public {
