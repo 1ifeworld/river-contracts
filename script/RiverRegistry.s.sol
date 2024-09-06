@@ -9,8 +9,9 @@ contract RiverRegistryScript is Script {
 
     RiverRegistry public riverRegistry;
     uint256 startingPrice = 0;
-    address startingPayoutRecipient = 0xC1fA1105e2b9Ca12d04676f4841479f106f3095e;
-    address public syndicateEoa = 0x10826C01a27B5E655853d2C54078935DDB374e32;
+    
+    address public riverBaseMultisig = 0xC2DBd41efC723563CBD9285E638Aad894745703B;
+    address public syndicateEoa = 0xEBB610288D38C8eA6B758950e3C89F35Ea073cf1;
     
     function setUp() public {}
 
@@ -22,12 +23,13 @@ contract RiverRegistryScript is Script {
         vm.startBroadcast(deployerPrivateKey);    
         
         // deploy riverRegistry
-        riverRegistry = new RiverRegistry(deployerWallet.addr, startingPayoutRecipient, startingPrice);  
+        riverRegistry = new RiverRegistry(deployerWallet.addr, riverBaseMultisig, startingPrice);  
 
         // set trusted callers
-        address[] memory trustedCallersForRiverRegistry = new address[](2);
+        address[] memory trustedCallersForRiverRegistry = new address[](3);
         trustedCallersForRiverRegistry[0] = deployerWallet.addr;
-        trustedCallersForRiverRegistry[1] = syndicateEoa;        
+        trustedCallersForRiverRegistry[1] = riverBaseMultisig;
+        trustedCallersForRiverRegistry[2] = syndicateEoa;        
         bool[] memory trues = new bool[](trustedCallersForRiverRegistry.length);
         for (uint256 i; i < trustedCallersForRiverRegistry.length; ++i) {
             trues[i] = true;
@@ -40,4 +42,4 @@ contract RiverRegistryScript is Script {
 
 // ======= DEPLOY SCRIPTS =====
 // source .env
-// forge script script/RiverRegistry.s.sol:RiverRegistryScript -vvvv --rpc-url $BASE_SEPOLIA_RPC_URL --broadcast --verify --verifier-url https://api-sepolia.basescan.org/api --etherscan-api-key $BASESCAN_API_KEY
+// forge script script/RiverRegistry.s.sol:RiverRegistryScript -vvvv --rpc-url $BASE_MAINNET_RPC_URL --broadcast --verify --verifier-url https://api.basescan.org/api --etherscan-api-key $BASESCAN_API_KEY

@@ -10,7 +10,7 @@ import {RiverRegistry} from "../src/RiverRegistry.sol";
 contract PrepMigrateScript is Script {
 
     RiverRegistry public riverRegistry;
-    address public mockRecoveryAddress = address(0x11111111);
+    address public riverMultiSigRecovery = address(0xC2DBd41efC723563CBD9285E638Aad894745703B);
     string fileContents;
     string json;
     bytes data;
@@ -20,7 +20,7 @@ contract PrepMigrateScript is Script {
     }
 
     function setUp() public {
-        riverRegistry = RiverRegistry(payable(0x1c83e2Ab421eAa3B089E6610084d61E92EA649F1));
+        riverRegistry = RiverRegistry(payable(0xE7A49E4398b10e9E27cE02894701b9Dd8cC5B0c7));
     }
 
     function run() public {
@@ -35,7 +35,7 @@ contract PrepMigrateScript is Script {
         // Decode data into custody set
         CustodySet memory custodySet = abi.decode(data, (CustodySet));         
 
-        riverRegistry.trustedPrepMigrationBatch(custodySet.wallets, mockRecoveryAddress);
+        riverRegistry.trustedPrepMigrationBatch(custodySet.wallets, riverMultiSigRecovery);
 
 
         vm.stopBroadcast();
@@ -44,4 +44,4 @@ contract PrepMigrateScript is Script {
 
 // ======= SCRIPTS =====
 // source .env
-// forge script script/PrepMigrate.s.sol:PrepMigrateScript -vvvv --rpc-url $BASE_SEPOLIA_RPC_URL --broadcast
+// forge script script/PrepMigrate.s.sol:PrepMigrateScript -vvvv --rpc-url $BASE_MAINNET_RPC_URL --broadcast
